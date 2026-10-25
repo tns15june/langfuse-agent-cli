@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>langfuse-agent-cli</title>
+<meta name="description" content="A command-line tool and agent skill that let coding agents debug LLM apps from Langfuse traces: failing traces in one call, traces as trees, compact JSON.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="langfuse-agent-cli: Langfuse traces, sized for coding agents">
+<meta property="og:description" content="Failing traces with their errors in one command, a trace as a tree, and large results as a file plus a short summary. pipx install langfuse-agent-cli">
+<meta property="og:url" content="https://tns15june.github.io/langfuse-agent-cli/">
+<meta property="og:image" content="https://tns15june.github.io/langfuse-agent-cli/lf-timeline.png">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1260">
+<meta property="og:image:alt" content="lf trace get --timeline marks the failing tool call, its error message and its input">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="langfuse-agent-cli: Langfuse traces, sized for coding agents">
+<meta name="twitter:description" content="Failing traces with their errors in one command, a trace as a tree, and large results as a file plus a short summary.">
+<meta name="twitter:image" content="https://tns15june.github.io/langfuse-agent-cli/lf-timeline.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230C131E'/%3E%3Ctext x='32' y='42' font-family='monospace' font-size='28' font-weight='700' fill='%23F0A748' text-anchor='middle'%3Elf%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400;500;600;700&family=Fragment+Mono&display=swap">
+<style>
+/* Layout: one 1120px column that reads like a trace view: the pitch beside a terminal of real lf output,
+   then measurements, the flow from question to diagnosis, and how it was tested. */
+:root {
+  --bg: #F2F4F7;
+  --surface: #FFFFFF;
+  --ink: #0E1726;
+  --muted: #566276;
+  --rule: #D7DDE6;
+  --accent: #2550E8;
+  --signal: #E28C1F;
+  --ok: #148A54;
+  --term-bg: #0C131E;
+  --term-fg: #DAE2EE;
+  --term-dim: #7E8BA1;
+  --term-ok: #4CCB8A;
+  --term-err: #FF7B7B;
+  --term-key: #93B4FF;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0A0F17; --surface: #111925; --ink: #E4E9F1; --muted: #93A0B4; --rule: #243145;
+    --accent: #7E9DFF; --signal: #F0A748; --ok: #3CC383;
+    --term-bg: #060A10;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, pre { font-family: var(--font-mono); }
+p code, li code, .note code { font-size: 0.9em; background: color-mix(in srgb, var(--rule) 55%, transparent); padding: 0.08em 0.36em; border-radius: 4px; }
+
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 48px 72px;
+  display: grid; gap: 88px;
+}
+.eyebrow { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.3rem, 5.4vw, 3.7rem); line-height: 1.02; letter-spacing: -0.025em; font-weight: 750; font-variation-settings: "opsz" 96; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); line-height: 1.1; letter-spacing: -0.015em; font-weight: 700; font-variation-settings: "opsz" 60; }
+h3 { font-size: 1.08rem; font-weight: 650; }
+.section-head { display: grid; gap: 10px; max-width: 68ch; }
+.section-head p { margin: 0; color: var(--muted); }
+section { display: grid; gap: 28px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.02fr); gap: 44px; align-items: start; }
+.hero-copy { display: grid; gap: 22px; min-width: 0; }
+.lede { font-size: 1.12rem; margin: 0; max-width: 54ch; }
+.lede code { font-size: 0.92em; background: color-mix(in srgb, var(--rule) 55%, transparent); padding: 0.06em 0.34em; border-radius: 4px; }
+.box { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; display: grid; min-width: 0; }
+.box-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.box pre { margin: 0; padding: 14px 16px; font-size: 0.95rem; line-height: 1.7; overflow-x: auto; }
+.box .prompt { color: var(--muted); user-select: none; }
+.box .say { margin: 0; padding: 14px 16px; font-size: 0.98rem; overflow-wrap: anywhere; }
+.note { color: var(--muted); font-size: 0.92rem; margin: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 18px; font-weight: 600; }
+.copy {
+  font: 600 0.8rem var(--font-body); color: var(--accent); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; white-space: nowrap;
+}
+.copy:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+.term { background: var(--term-bg); color: var(--term-fg); border-radius: 14px; overflow: hidden; min-width: 0; }
+.term-head { display: flex; justify-content: space-between; gap: 12px; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.74rem; color: var(--term-dim); border-bottom: 1px solid color-mix(in srgb, var(--term-dim) 25%, transparent); }
+.term pre { margin: 0; padding: 16px 18px 18px; font-size: 0.8rem; line-height: 1.65; overflow-x: auto; }
+.t-cmd::before { content: "$ "; color: var(--term-dim); }
+.t-ok { color: var(--term-ok); }
+.t-err { color: var(--term-err); }
+.t-dim { color: var(--term-dim); }
+.t-key { color: var(--term-key); }
+
+.bars { display: grid; gap: 22px; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 24px; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px; gap: 8px 18px; align-items: center; }
+.bar-row + .bar-row { padding-top: 22px; border-top: 1px solid var(--rule); }
+.bar-label { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
+.bar-label strong { font-weight: 600; }
+.bar-label span { color: var(--muted); font-size: 0.88rem; }
+.pair { display: grid; gap: 6px; min-width: 0; }
+.track { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.fill { height: 14px; border-radius: 3px; width: var(--w); min-width: 3px; }
+.fill.before { background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.fill.after { background: var(--signal); }
+.val { font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.delta { font-family: var(--font-display); font-weight: 750; font-size: 1.5rem; color: var(--signal); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.86rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+.legend .b { background: color-mix(in srgb, var(--muted) 35%, transparent); }
+.legend .a { background: var(--signal); }
+
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.node { position: relative; padding: 18px 22px 18px 0; display: grid; gap: 6px; align-content: start; }
+.node + .node { padding-left: 22px; border-left: 1px dashed var(--rule); }
+.node .eyebrow { color: var(--accent); }
+.node p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+.node .arrow { position: absolute; top: 18px; right: -9px; color: var(--muted); font-family: var(--font-mono); background: var(--bg); z-index: 1; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px; display: grid; gap: 6px; align-content: start; }
+.stat b { font-family: var(--font-display); font-size: 2rem; line-height: 1; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat span { color: var(--muted); font-size: 0.9rem; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 80ch; }
+.checks li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; }
+.checks li::before { content: "✓"; color: var(--ok); font-weight: 700; }
+
+.agent { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.agent ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--muted); }
+
+footer { display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 24px; color: var(--muted); font-size: 0.9rem; }
+footer p { margin: 0; max-width: 90ch; }
+
+@media (max-width: 900px) {
+  .hero, .agent { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow { grid-template-columns: minmax(0, 1fr); }
+  .node, .node + .node { padding: 14px 0 14px 18px; border-left: 2px solid var(--rule); }
+  .node .arrow { display: none; }
+}
+@media (max-width: 480px) {
+  .stats { grid-template-columns: minmax(0, 1fr); }
+  .bars { padding: 18px; }
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow">langfuse-agent-cli · MIT · Python 3.10+</div>
+      <h1>Langfuse traces, sized for coding agents</h1>
+      <p class="lede"><code>lf</code> is a command-line tool and an agent skill. A coding agent asks for the failing traces and gets their error messages in one call, sees a trace as a tree, and receives large results as a file plus a short summary.</p>
+      <div class="box">
+        <div class="box-top"><span class="eyebrow">Install</span><button class="copy" type="button" data-copy="install-cmds">Copy</button></div>
+        <pre><span class="prompt">$ </span><span id="install-cmds">pipx install langfuse-agent-cli
+lf setup</span></pre>
+      </div>
+      <p class="note"><code>lf setup</code> keeps working keys or asks for them, installs the skill for your coding agents, and runs <code>lf doctor</code>. Works with Langfuse v4, self-hosted or Cloud.</p>
+      <nav class="links" aria-label="Project links">
+        <a href="https://github.com/tns15june/langfuse-agent-cli">GitHub</a>
+        <a href="https://pypi.org/project/langfuse-agent-cli/">PyPI</a>
+        <a href="https://github.com/tns15june/langfuse-agent-cli/releases">Releases</a>
+        <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/RFC.md">RFC</a>
+      </nav>
+    </div>
+
+    <div class="term" aria-label="Example lf output">
+      <div class="term-head"><span>what the agent sees</span><span>Langfuse 4.70 · synthetic data · shortened</span></div>
+<pre><span class="t-cmd">lf trace get 33579e8e8ec602e878f0744ad53ac1fe --timeline</span>
+Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
+<span class="t-ok">✓</span> AGENT support-agent-turn
+  <span class="t-ok">✓</span> GENERATION plan-step <span class="t-dim">(model: gpt-4o-mini)</span>
+  <span class="t-err">✗ [ERROR]</span> TOOL search_tool_call
+      <span class="t-dim">Message:</span> <span class="t-err">503 Service Unavailable</span>
+
+<span class="t-cmd">lf trace list --limit 100 --output-summary</span>
+{
+  <span class="t-key">"summary"</span>: true,
+  <span class="t-key">"outputFile"</span>: "/tmp/lf-y7qgu_0r.json",
+  <span class="t-key">"bytes"</span>: 24322,
+  <span class="t-key">"rows"</span>: 36,
+  <span class="t-key">"rowKeys"</span>: ["id", "traceId", "name", "level", "latency", <span class="t-dim">…</span>],
+  <span class="t-key">"hint"</span>: "The JSON output is larger than 16 KB, so it was <span class="t-dim">…</span>"
+}</pre>
+    </div>
+  </header>
+
+  <section aria-labelledby="measured">
+    <div class="section-head">
+      <span class="eyebrow">Measured</span>
+      <h2 id="measured">Smaller output, same answers</h2>
+      <p>Measured on Langfuse 4.70 with synthetic data. Real traces with long prompts and outputs shrink by more.</p>
+    </div>
+    <div class="bars">
+      <div class="legend"><span><i class="b"></i>Before</span><span><i class="a"></i>With lf</span></div>
+      <div class="bar-row">
+        <div class="bar-label"><strong>One trace: every field group vs. the groups <code>lf trace get</code> asks for</strong><span>3 observations</span></div>
+        <div class="pair">
+          <div class="track"><div class="fill before" style="--w: 100%"></div><span class="val">12.9 KB</span></div>
+          <div class="track"><div class="fill after" style="--w: 22.5%"></div><span class="val">2.9 KB</span></div>
+        </div>
+        <div class="delta">−78%</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><strong>Failing observations: the full rows vs. 7 triage fields with <code>--agent-fields</code></strong><span>4 rows</span></div>
+        <div class="pair">
+          <div class="track"><div class="fill before" style="--w: 100%"></div><span class="val">3.0 KB</span></div>
+          <div class="track"><div class="fill after" style="--w: 35%"></div><span class="val">1.05 KB</span></div>
+        </div>
+        <div class="delta">−66%</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label"><strong>A 100-trace listing vs. the summary <code>--output-summary</code> prints</strong><span>36 rows; the full JSON goes to a file</span></div>
+        <div class="pair">
+          <div class="track"><div class="fill before" style="--w: 100%"></div><span class="val">24.3 KB</span></div>
+          <div class="track"><div class="fill after" style="--w: 2.9%"></div><span class="val">0.7 KB</span></div>
+        </div>
+        <div class="delta">−97%</div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="how">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2 id="how">From a question to a diagnosis</h2>
+    </div>
+    <div class="flow">
+      <div class="node">
+        <span class="eyebrow">Coding agent</span>
+        <h3>Claude Code, Codex, Cursor…</h3>
+        <p>Asked “why did my app fail?”, it loads the skill on its own.</p>
+        <span class="arrow" aria-hidden="true">→</span>
+      </div>
+      <div class="node">
+        <span class="eyebrow">Skill</span>
+        <h3>SKILL.md</h3>
+        <p>Teaches the commands and the rules: keep output small, read before writing, never ask for keys in chat.</p>
+        <span class="arrow" aria-hidden="true">→</span>
+      </div>
+      <div class="node">
+        <span class="eyebrow">CLI</span>
+        <h3><code>lf</code></h3>
+        <p>Reads <code>/api/public/v2/observations</code>, the trace read path on Langfuse v4, plus prompts, datasets and scores.</p>
+        <span class="arrow" aria-hidden="true">→</span>
+      </div>
+      <div class="node">
+        <span class="eyebrow">Output</span>
+        <h3>Compact JSON, a tree, or a summary file</h3>
+        <p>Sized for a context window, with errors and their messages up front.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="agent-install">
+    <div class="section-head">
+      <span class="eyebrow">Let your agent install it</span>
+      <h2 id="agent-install">One line for your coding agent</h2>
+    </div>
+    <div class="agent">
+      <div class="box">
+        <div class="box-top"><span class="eyebrow">Prompt</span><button class="copy" type="button" data-copy="agent-prompt">Copy</button></div>
+        <p class="say" id="agent-prompt">Install langfuse-agent-cli by following https://raw.githubusercontent.com/tns15june/langfuse-agent-cli/main/INSTALL.md</p>
+      </div>
+      <ol>
+        <li>The agent installs <code>lf</code> from PyPI with uv or pipx.</li>
+        <li>It runs <code>lf setup --yes</code>, which installs the skill for that agent and never prompts.</li>
+        <li>If no keys are configured, it asks you to run <code>lf setup</code> in your own terminal. It never asks for keys in chat.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section aria-labelledby="verified">
+    <div class="section-head">
+      <span class="eyebrow">Verified</span>
+      <h2 id="verified">Tested the way people will use it</h2>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>219</b><span>unit tests, on Python 3.10, 3.11, 3.12 and 3.13 in CI</span></div>
+      <div class="stat"><b>11 / 11</b><span>live tests against the newest Langfuse release in CI, and 4.70 locally</span></div>
+      <div class="stat"><b>26 / 26</b><span>command checks with the build downloaded from PyPI</span></div>
+      <div class="stat"><b>25 s</b><span>for a fresh Claude Code session to find the failures and name the cause</span></div>
+    </div>
+    <ul class="checks">
+      <li><span>A clean <code>uv tool install langfuse-agent-cli</code> followed by <code>lf setup --yes</code> installed the skill from the release tag, and <code>lf doctor</code> passed.</span></li>
+      <li><span>The agent session had only the skill installed. It picked the skill on its own, ran three <code>lf</code> commands, used <code>--output-summary</code> without being told, and traced the failures to a search tool returning 503s.</span></li>
+      <li><span>CI runs weekly against the newest Langfuse release, so API changes show up before users report them.</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>Built by Tarkeshwar Narayan (tns15june). A community project, not affiliated with Langfuse. The command map, the summary envelope and one-step setup follow Atlassian’s Teamwork Graph CLI. MIT license.</p>
+    <nav class="links" aria-label="More links">
+      <a href="https://github.com/tns15june/langfuse-agent-cli">GitHub</a>
+      <a href="https://pypi.org/project/langfuse-agent-cli/">PyPI</a>
+      <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/INSTALL.md">INSTALL.md</a>
+      <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/RFC.md">RFC</a>
+      <a href="https://github.com/tns15june/langfuse-agent-cli/issues">Issues</a>
+    </nav>
+  </footer>
+</main>
+
+<script>
+  function selectText(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const el = document.getElementById(btn.dataset.copy);
+      const text = el.innerText.replace(/ /g, " ").trim();
+      const done = (label) => { btn.textContent = label; setTimeout(() => { btn.textContent = "Copy"; }, 1800); };
+      const fallback = () => { selectText(el); done("Selected"); };
+      try {
+        navigator.clipboard.writeText(text).then(() => done("Copied"), fallback);
+      } catch (e) {
+        fallback();
+      }
+    });
+  });
+</script>
+</body>
+</html>

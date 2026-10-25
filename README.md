@@ -4,6 +4,8 @@ Command-line access to [Langfuse](https://langfuse.com) traces, prompts, dataset
 for AI coding agents: JSON by default (`--compact` trims it), failing traces with their error messages
 in one command, a trace as a tree, and an agent skill that teaches the commands.
 
+![lf trace get --timeline --io marks the failing tool call with its error message and its input](https://raw.githubusercontent.com/tns15june/langfuse-agent-cli/main/docs/lf-timeline.png)
+
 > **Status: prototype.** Langfuse ships an official CLI,
 > [`@langfuse/cli`](https://github.com/langfuse/langfuse-cli), which covers the whole API, and official
 > agent skills, [`langfuse/skills`](https://github.com/langfuse/skills). This project tries out

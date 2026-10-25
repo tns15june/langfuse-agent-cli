@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tns15june/langfuse-agent-cli"
+Homepage = "https://tns15june.github.io/langfuse-agent-cli/"
 Repository = "https://github.com/tns15june/langfuse-agent-cli"
 Issues = "https://github.com/tns15june/langfuse-agent-cli/issues"
 
