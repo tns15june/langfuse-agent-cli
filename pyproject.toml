@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [
     { name = "Tarkeshwar Narayan", email = "122815908+tns15june@users.noreply.github.com" }
 ]
-keywords = ["langfuse", "llm", "observability", "agent", "claude", "cursor", "antigravity", "skills"]
+keywords = ["langfuse", "llm", "observability", "agent", "cli", "skills"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
