@@ -1,5 +1,6 @@
 import json as jsonlib
 import os
+import tempfile
 from urllib.parse import urlsplit
 
 import pytest
@@ -11,8 +12,9 @@ from langfuse_cli.commands import doctor
 
 @pytest.fixture(autouse=True)
 def isolated_config(tmp_path, monkeypatch):
-    """Keep every test away from the real profiles file, ./.env and LANGFUSE_* variables."""
+    """Keep every test away from the real profiles file, ./.env, LANGFUSE_* variables and the temp directory."""
     monkeypatch.setattr(config, "DEFAULT_PROFILES_FILE", tmp_path / "profiles.json")
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))  # --output-summary files
     monkeypatch.chdir(tmp_path)
     for name in [n for n in os.environ if n.startswith("LANGFUSE_")]:
         monkeypatch.delenv(name)

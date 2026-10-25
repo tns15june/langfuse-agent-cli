@@ -7,29 +7,55 @@ in one command, a trace as a tree, and an agent skill that teaches the commands.
 > **Status: prototype.** Langfuse ships an official CLI,
 > [`@langfuse/cli`](https://github.com/langfuse/langfuse-cli), which covers the whole API, and official
 > agent skills, [`langfuse/skills`](https://github.com/langfuse/skills). This project tries out
-> agent-oriented features on the same API. [RFC.md](./RFC.md) describes which of them it proposes
-> upstream.
+> agent-oriented features on the same API.
+> [RFC.md](https://github.com/tns15june/langfuse-agent-cli/blob/main/RFC.md) describes which of them it
+> proposes upstream.
 
 ## Requirements
 
 - Python 3.10 or newer
 - Langfuse v4, self-hosted or Cloud. The trace commands read `/api/public/v2/observations`;
   `lf doctor` reports if a server does not have it.
+- Node.js 22.20 or newer, only for installing the agent skill
 
 ## Install
 
 ```bash
-pipx install git+https://github.com/tns15june/langfuse-agent-cli
-# or
-uv tool install git+https://github.com/tns15june/langfuse-agent-cli
+pipx install langfuse-agent-cli   # or: uv tool install langfuse-agent-cli
+lf setup
 ```
 
-The agent skill (`langfuse-agent-cli`) installs with the [skills CLI](https://github.com/vercel-labs/skills).
-`-g` makes it available in all your projects; without it, the skill goes into the current project:
+`lf setup` takes three steps and is safe to run again:
+
+1. **Credentials.** It keeps working credentials that it finds. Otherwise it asks for the host and
+   the keys (the secret is not echoed) and saves them as a profile.
+2. **Agent skill.** It installs the `langfuse-agent-cli` skill with the
+   [skills CLI](https://github.com/vercel-labs/skills), which asks which coding agents to install it
+   for when it finds more than one. The skill comes from the release tag that matches your `lf`
+   version.
+3. **Check.** It runs `lf doctor`.
+
+To have a coding agent install it, give the agent this prompt:
+
+```text
+Install langfuse-agent-cli by following https://raw.githubusercontent.com/tns15june/langfuse-agent-cli/main/INSTALL.md
+```
+
+The agent installs the CLI and runs `lf setup --yes`, which never prompts. If no credentials are
+configured, it asks you to run `lf auth login` yourself.
+
+To install the latest code from GitHub instead of PyPI:
+`pipx install git+https://github.com/tns15june/langfuse-agent-cli`.
+
+### Upgrade and uninstall
 
 ```bash
-npx skills add tns15june/langfuse-agent-cli -g
+pipx upgrade langfuse-agent-cli && lf setup   # lf setup also installs the matching skill
+npx skills remove --global langfuse-agent-cli
+pipx uninstall langfuse-agent-cli
 ```
+
+Saved profiles stay in `~/.config/langfuse/profiles.json` until you delete that file.
 
 ## Credentials
 
@@ -45,7 +71,7 @@ npx skills add tns15june/langfuse-agent-cli -g
 profile over passing keys on the command line, where they end up in shell history. `lf` reads a
 `.env` file only when it is passed with `--env-file`.
 
-To save a profile (the keys are prompted for, and the secret is not echoed):
+To save another profile (the keys are prompted for, and the secret is not echoed):
 
 ```bash
 lf auth login --profile-name local --host http://localhost:3000 --default
@@ -56,9 +82,13 @@ Profiles live in `~/.config/langfuse/profiles.json`, readable only by you (mode 
 
 ## Commands
 
-Data commands print JSON by default and short lines with `-o text`; `doctor`, `auth` and `help-map`
-print text. `--compact` drops null and empty fields, and `--agent-fields name,level` keeps only the
-listed fields of each row.
+Data commands print JSON by default and short lines with `-o text`; `doctor`, `setup`, `auth` and
+`help-map` print text. Three options keep JSON small:
+
+- `--compact` drops null and empty fields.
+- `--agent-fields name,level` keeps only the listed fields of each row.
+- `--output-summary` writes JSON output over 16 KB to a file and prints the file's path, size and keys
+  instead.
 
 ```bash
 # Failing traces, one entry per trace, with each error message
@@ -66,6 +96,9 @@ lf trace list --status error --limit 10 --compact
 
 # One trace as a tree; add --io for short inputs and outputs
 lf trace get <trace-id> --timeline
+
+# A trace with its inputs and outputs; over 16 KB it goes to a file
+lf trace get <trace-id> --io --output-summary
 
 # The traces of a session, oldest first (the newest 1000)
 lf trace session <session-id> --compact
@@ -92,15 +125,19 @@ lf help "trace get"
 A timeline, from synthetic data:
 
 ```text
-Trace 487b674e9a38e8d85cd683d2f022bf1d: 3 observations, 1 error
-✓ AGENT support-agent-turn [1ms]
-  ✓ GENERATION plan-step [0ms] (model: gpt-4o-mini)
-  ✗ [ERROR] TOOL search_tool_call [0ms]
+Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
+✓ AGENT support-agent-turn
+  ✓ GENERATION plan-step (model: gpt-4o-mini)
+  ✗ [ERROR] TOOL search_tool_call
       Message: 503 Service Unavailable
 ```
 
+Observations with a measured duration show it in brackets, such as `[1.24s]`. Langfuse 4.70 reports
+no duration for observations of zero length, like these synthetic ones.
+
 Exit codes: `0` success, `1` API or configuration error, `2` invalid command. The reason for a failure is
-on stderr, except that `doctor` and `auth status` print their whole report, failures included, on stdout.
+on stderr, except that `doctor`, `setup` and `auth status` print their whole report, failures included,
+on stdout.
 
 ## API endpoints used
 
@@ -115,6 +152,7 @@ on stderr, except that `doctor` and `auth status` print their whole report, fail
 | `score create` | `POST /api/public/scores` |
 | `doctor` | `/api/public/health`, `/api/public/projects`, `/api/public/v2/observations?limit=1` |
 | `auth login`, `auth status` | `/api/public/projects` |
+| `setup` | `/api/public/projects`, then the `doctor` requests |
 
 ## Development
 
@@ -138,9 +176,23 @@ LF_LIVE=1 pytest tests/test_live.py -v
 CI runs the unit tests on Python 3.10 to 3.13 and the live tests against the latest Langfuse release,
 on every push and weekly.
 
+### Releasing
+
+The Publish workflow uploads to PyPI with trusted publishing, so no token is stored. Bump
+`__version__` in `langfuse_cli/__init__.py`, push to `main`, then tag that commit:
+
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+
+The workflow checks that the tag matches the version, runs the tests, builds and checks the
+distributions, installs the wheel, and uploads it. Tag right after the version bump, because
+`lf setup` installs the skill from the tag that matches the version.
+
 ## Prior art
 
-The command map (`lf help-map`) and the `--agent-fields` option follow Atlassian's
+The command map (`lf help-map`), the `--agent-fields` and `--output-summary` options, `lf setup` and
+the agent install prompt follow Atlassian's
 [Teamwork Graph CLI](https://developer.atlassian.com/platform/teamwork-graph/twg-cli/getting-started/installation/).
 
 ## License

@@ -2,14 +2,14 @@
 
 **Author**: Tarkeshwar Narayan (tns15june)
 **Status**: Draft for discussion
-**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.2.0
+**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.3.0
 
 ## Summary
 
 Langfuse already has an official CLI and official agent skills. This RFC proposes three small,
 separable features for `@langfuse/cli` that let coding agents control how much of a response reaches
-their context, plus two rules for `langfuse/skills`. Proposals 2 and 3 are prototyped in
-`langfuse-agent-cli`, and proposal 2 is measured below.
+their context, plus two rules for `langfuse/skills`. All three are prototyped in `langfuse-agent-cli`,
+and proposals 1 and 2 are measured below.
 
 ## What exists today
 
@@ -39,6 +39,8 @@ traffic has longer messages and more metadata, so the numbers will differ.
 | `npx @langfuse/cli api observations list --level ERROR` (4 rows) | 3.0 KB |
 | The same output, keeping 7 triage fields | 1.05 KB (−66%) |
 | The same output, dropping null and empty-string fields | 2.4 KB (−21%) |
+| `lf trace list --limit 100` (36 rows, from running the seed script three times) | 24.3 KB |
+| The same, with `--output-summary` (the envelope) | 0.7 KB (−97%) |
 
 ## Proposals
 
@@ -48,10 +50,15 @@ traffic has longer messages and more metadata, so the numbers will differ.
 
 **Proposal.** `--output-summary auto`: when the JSON payload exceeds a threshold (for example
 16 KB), write it to a file and print a short envelope instead, with the file path, byte size, row
-count, the keys of the first row and the next cursor. Below the threshold, print the payload as
-today. See Prior art.
+count, the keys of the rows and, for a paged response, the next cursor. Below the threshold, print
+the payload as today. See Prior art.
 
-**Prototype.** Not yet.
+**Prototype.** `--output-summary` in `langfuse_cli/formatters/agent.py`, with a 16 KB threshold,
+measured after field projection and pruning. The file goes to the system temp directory, readable
+only by the user. The envelope starts with `"summary": true`, so a caller can tell it from a payload
+that is itself an object; on the 24.3 KB listing in the table above it is 0.7 KB. The prototype's
+commands follow cursors themselves, so its envelope has no cursor. The generated CLI returns one page
+unless given `--all`, so its envelope would carry `meta.cursor`.
 
 ### 2. Field projection and pruning
 
@@ -112,3 +119,5 @@ A separate, small pull request adds field-selection and `--level ERROR` tips to
 The command map (`help-map`), the `--agent-fields` option and the summary envelope
 (`--output-summary`) come from Atlassian's
 [Teamwork Graph CLI](https://developer.atlassian.com/platform/teamwork-graph/twg-cli/getting-started/installation/).
+Its envelope is YAML and has several levels (`none`, `stats`, `auto`, `inline`); the prototype's is
+JSON and has only the automatic behaviour.

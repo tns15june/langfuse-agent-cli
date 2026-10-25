@@ -8,7 +8,7 @@ import pytest
 from langfuse_cli.cli import create_parser
 
 ROOT = Path(__file__).resolve().parent.parent
-DOC_FILES = sorted((ROOT / "skills").rglob("*.md")) + [ROOT / "README.md"]
+DOC_FILES = sorted((ROOT / "skills").rglob("*.md")) + [ROOT / "README.md", ROOT / "INSTALL.md"]
 INLINE_COMMAND = re.compile(r"`(lf [^`]+)`")
 
 

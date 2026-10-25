@@ -1,10 +1,12 @@
 """Checks against a real Langfuse seeded by scripts/seed_langfuse.py. Skipped unless LF_LIVE=1."""
 import json
 import os
+from pathlib import Path
 
 import pytest
 
 from langfuse_cli.cli import main
+from langfuse_cli.formatters import agent
 
 pytestmark = pytest.mark.skipif(not os.environ.get("LF_LIVE"),
                                 reason="set LF_LIVE=1 with LANGFUSE_* pointing at a seeded instance")
@@ -49,6 +51,18 @@ def test_trace_get_timeline_marks_the_error(capsys):
     code, out, _ = run(capsys, "trace", "get", trace_id, "--timeline")
     assert code == 0
     assert "✗ [ERROR]" in out
+
+
+def test_output_summary_writes_the_trace_to_a_file(capsys, monkeypatch):
+    monkeypatch.setattr(agent, "SUMMARY_THRESHOLD_BYTES", 1024)  # a seeded trace with --io is about 12 KB
+    trace_id = run_json(capsys, "trace", "list", "--status", "error", "--limit", "1")[0]["traceId"]
+
+    envelope = run_json(capsys, "trace", "get", trace_id, "--io", "--output-summary")
+
+    rows = json.loads(Path(envelope["outputFile"]).read_text(encoding="utf-8"))
+    assert envelope["summary"] is True
+    assert len(rows) == envelope["rows"]
+    assert {"input", "output"} <= set(envelope["rowKeys"])
 
 
 def test_trace_session_lists_its_traces(capsys):
