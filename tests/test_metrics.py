@@ -61,6 +61,9 @@ def test_unknown_aggregation_fails_before_any_request(fake_api, capsys):
 @pytest.mark.parametrize("expr,expected", [
     ("level=ERROR", {"column": "level", "operator": "=", "value": "ERROR", "type": "string"}),
     ("isRootObservation=true", {"column": "isRootObservation", "operator": "=", "value": True, "type": "boolean"}),
+    ("isRootObservation=false", {"column": "isRootObservation", "operator": "=", "value": False, "type": "boolean"}),
+    ("isRootObservation=TRUE", {"column": "isRootObservation", "operator": "=", "value": True, "type": "boolean"}),
+    ("value=0.5", {"column": "value", "operator": "=", "value": 0.5, "type": "number"}),
     ("tags=beta", {"column": "tags", "operator": "any of", "value": ["beta"], "type": "arrayOptions"}),
     ("promptVersion=3", {"column": "promptVersion", "operator": "=", "value": 3, "type": "number"}),
     ("name=a=b", {"column": "name", "operator": "=", "value": "a=b", "type": "string"}),
@@ -139,7 +142,7 @@ def test_text_output_without_rows(fake_api, capsys):
 
     _, out, _ = run(capsys, "metrics", "-o", "text", *WEEK)
 
-    assert out.strip() == "No data in this time range."
+    assert out.strip().startswith("No data from ")
 
 
 def test_server_error_detail_reaches_the_user(fake_api, capsys):
@@ -152,10 +155,11 @@ def test_server_error_detail_reaches_the_user(fake_api, capsys):
 
     assert code == 1
     assert "Invalid request data" in err and "expected one of" in err
+    assert err.count("\n") == 1
 
 
 @pytest.mark.parametrize("limit", ["0", "1001", "x"])
-def test_limit_outside_1_to_1000_is_rejected(limit):
+def test_limit_outside_1_to_1000_is_rejected(fake_api, limit):
     with pytest.raises(SystemExit) as exc:
         main(["metrics", "--limit", limit, *FLAGS])
     assert exc.value.code == 2
@@ -194,3 +198,74 @@ def test_a_result_under_the_row_limit_does_not_warn(fake_api, capsys):
     _, _, err = run(capsys, "metrics", "--by", "name", *WEEK)
 
     assert err == ""
+
+
+@pytest.mark.parametrize("expr,needs", [("isRootObservation=yes", "true or false"), ("promptVersion=abc", "a number")])
+def test_filter_values_of_the_wrong_kind_fail_before_any_request(fake_api, capsys, expr, needs):
+    code, _, err = run(capsys, "metrics", "--where", expr)
+
+    assert code == 1
+    assert f"--where {expr.split('=')[0]}" in err and needs in err
+    assert fake_api.calls == []
+
+
+def test_metric_spec_tolerates_spaces_and_trailing_commas():
+    assert parse_metrics(" count , latency:p95 ,") == [
+        {"measure": "count", "aggregation": "count"}, {"measure": "latency", "aggregation": "p95"}]
+
+
+def test_empty_metric_spec_fails_before_any_request(fake_api, capsys):
+    code, _, err = run(capsys, "metrics", "--metric", " , ")
+
+    assert code == 1 and "--metric" in err
+    assert fake_api.calls == []
+
+
+@pytest.mark.parametrize("limit", ["1", "1000"])
+def test_limit_boundaries_are_accepted(fake_api, capsys, limit):
+    fake_api.route("GET", METRICS, json={"data": []})
+
+    assert run(capsys, "metrics", "--limit", limit, *WEEK)[0] == 0
+    assert sent_query(fake_api)["config"] == {"row_limit": int(limit)}
+
+
+def test_default_window_is_named_on_stderr(fake_api, capsys):
+    fake_api.route("GET", METRICS, json={"data": []})
+
+    _, out, err = run(capsys, "metrics")
+
+    assert json.loads(out) == []
+    assert "last 24 hours" in err and "--from-ts" in err
+
+
+def test_an_explicit_window_is_not_announced(fake_api, capsys):
+    fake_api.route("GET", METRICS, json={"data": [{"count_count": 1}]})
+
+    _, _, err = run(capsys, "metrics", *WEEK)
+
+    assert err == ""
+
+
+def test_empty_text_output_names_the_window(fake_api, capsys):
+    fake_api.route("GET", METRICS, json={"data": []})
+
+    _, out, _ = run(capsys, "metrics", "-o", "text", *WEEK)
+
+    assert out.strip() == "No data from 2026-10-18T00:00:00Z to 2026-10-25T00:00:00Z."
+
+
+@pytest.mark.parametrize("body", [
+    {"message": "Prompt not found", "error": "LangfuseNotFoundError"},  # Langfuse's typed errors: a string
+    {"message": "Prompt not found", "error": []},
+    {"message": "Prompt not found", "error": ["x"]},
+    {"message": "Prompt not found", "error": [{"code": 1}]},
+    {"message": "Prompt not found", "error": [{"message": ""}]},
+    {"message": "Prompt not found"},
+], ids=["string", "empty-list", "list-of-str", "dict-without-message", "empty-detail", "no-error-key"])
+def test_error_bodies_without_a_usable_detail_keep_the_message(fake_api, capsys, body):
+    fake_api.route("GET", METRICS, status=404, json=body)
+
+    code, _, err = run(capsys, "metrics", *WEEK)
+
+    assert code == 1
+    assert err == "Error: HTTP 404: Prompt not found\n"

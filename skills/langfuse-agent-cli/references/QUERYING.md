@@ -48,10 +48,10 @@ Monday. Say in the answer which window you used.
 | `--metric totalCost,latency:p95` | What to compute: measure, then an optional aggregation |
 | `--by providedModelName,name` | Group by these dimensions |
 | `--where level=ERROR` | Filter; repeat it for more |
-| `--granularity hour` | Group by time: minute, hour, day, week, month or auto |
+| `--granularity hour` | Group by time: minute, hour, day, week, month or auto. Rows come in time order with empty buckets included; do not add `--order-by`, which drops the empty buckets |
 | `--from-ts`, `--to-ts` | The window; the last 24 hours by default |
 | `--order-by sum_totalCost` | Sort by a result key, largest first; add `:asc` for smallest first |
-| `--limit 20` | Return at most this many rows (1 to 1000, default 100) |
+| `--limit 20` | Return at most this many rows (1 to 1000; default 100, or 1000 with `--granularity`). When the result fills the limit, lf says so on stderr and more rows may exist |
 | `--view scores-numeric` | Aggregate scores instead of observations |
 
 Observation measures: `count`, `latency`, `timeToFirstToken`, `streamingLatency`, `inputTokens`,

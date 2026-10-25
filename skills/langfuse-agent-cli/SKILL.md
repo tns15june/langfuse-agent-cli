@@ -83,8 +83,9 @@ current state first (for example `lf prompt get <name>`) and tell the user what 
 - If credentials are missing, ask the user to run `lf setup` in their own terminal, or to set
   `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL`. Never ask for keys in chat.
 - If `lf` is not installed and the user asks you to install it, follow
-  https://tns15june.github.io/langfuse-agent-cli/AGENTS.md. Otherwise tell them:
-  `pipx install langfuse-agent-cli`, then `lf setup`.
+  https://tns15june.github.io/langfuse-agent-cli/AGENTS.md. Otherwise tell them: on macOS or Linux,
+  `curl -fsSL https://tns15june.github.io/langfuse-agent-cli/install.sh | sh`; or
+  `uv tool install langfuse-agent-cli` (or `pipx install langfuse-agent-cli`), then `lf setup`.
 
 ## Errors
 

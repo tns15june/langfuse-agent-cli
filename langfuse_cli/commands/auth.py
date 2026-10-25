@@ -10,13 +10,22 @@ from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.config import ConfigManager, resolve_from_args
 
 
+def ask(prompt: str, hidden: bool = False) -> Optional[str]:
+    """Prompt on the terminal; None when the input ends (Ctrl-D), so callers can treat that as no answer."""
+    try:
+        return (getpass.getpass(prompt) if hidden else input(prompt)).strip()
+    except EOFError:
+        print()
+        return None
+
+
 def login(cfg: ConfigManager, profile_name: str, host: str, public_key: Optional[str], secret_key: Optional[str],
           set_default: bool) -> int:
     """Prompt for missing keys, save the profile, then verify the keys against the server."""
     if not public_key:
-        public_key = input("Enter Langfuse Public Key (pk-lf-...): ").strip()
+        public_key = ask("Enter Langfuse Public Key (pk-lf-...): ") or ""
     if not secret_key:
-        secret_key = getpass.getpass("Enter Langfuse Secret Key (sk-lf-...): ").strip()
+        secret_key = ask("Enter Langfuse Secret Key (sk-lf-...): ", hidden=True) or ""
     if not public_key or not secret_key:  # an empty answer must never replace saved keys
         print("✗ Both keys are needed; nothing was saved.", file=sys.stderr)
         return 1

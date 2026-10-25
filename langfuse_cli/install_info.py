@@ -30,7 +30,9 @@ def install_method(prefix: str = sys.prefix) -> str:
 
 def find_tool(name: str) -> Tuple[Optional[str], str]:
     """The program to run, or (None, why not)."""
-    path = shutil.which(name)
+    # Agents often run ~/.local/bin/lf with that folder missing from PATH; uv and pipx put their launchers there too.
+    search = os.pathsep.join([os.environ.get("PATH", os.defpath), os.path.dirname(lf_location())])
+    path = shutil.which(name, path=search)
     if path is None:
         return None, f"{name} not found"
     # On Windows, which() searches the current folder first; never run a program a project folder supplies.
@@ -50,12 +52,18 @@ def lf_location() -> str:
     return os.path.abspath(sys.argv[0])
 
 
+def skill_lock_path() -> Path:
+    """Where `npx skills` keeps its global lock: $XDG_STATE_HOME/skills when that is set, else ~/.agents."""
+    xdg = os.environ.get("XDG_STATE_HOME")
+    return (Path(xdg) / "skills" if xdg else AGENTS_DIR) / ".skill-lock.json"
+
+
 def installed_skill_ref() -> Optional[str]:
     """The ref (e.g. 'v0.4.0') the global skill was installed from, or None when it is not installed."""
     if not (AGENTS_DIR / "skills" / SKILL_NAME / "SKILL.md").exists():
         return None
     try:
-        ref = json.loads((AGENTS_DIR / ".skill-lock.json").read_text(encoding="utf-8"))["skills"][SKILL_NAME]["ref"]
+        ref = json.loads(skill_lock_path().read_text(encoding="utf-8"))["skills"][SKILL_NAME]["ref"]
     except (OSError, ValueError, KeyError, TypeError):
         return None
     return ref if isinstance(ref, str) else None

@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>langfuse-agent-cli</title>
-<meta name="description" content="A command-line tool and agent skill that let coding agents debug LLM apps from Langfuse traces: failing traces in one call, traces as trees, compact JSON.">
+<meta name="description" content="Ask your coding agent about your LLM app in plain English; it answers from your Langfuse data with lf: failing traces with their errors, a trace as a tree, cost, latency, prompts and scores.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="langfuse-agent-cli: Langfuse traces, sized for coding agents">
-<meta property="og:description" content="Failing traces with their errors in one command, a trace as a tree, and large results as a file plus a short summary. pipx install langfuse-agent-cli">
+<meta property="og:description" content="Ask your coding agent about your LLM app in plain English. lf answers from your Langfuse data: failing traces with their errors, a trace as a tree, cost, latency, prompts and scores. One-line install.">
 <meta property="og:url" content="https://tns15june.github.io/langfuse-agent-cli/">
 <meta property="og:image" content="https://tns15june.github.io/langfuse-agent-cli/lf-timeline.png">
 <meta property="og:image:width" content="2400">
@@ -15,7 +15,7 @@
 <meta property="og:image:alt" content="lf trace get --timeline marks the failing tool call, its error message and its input">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="langfuse-agent-cli: Langfuse traces, sized for coding agents">
-<meta name="twitter:description" content="Failing traces with their errors in one command, a trace as a tree, and large results as a file plus a short summary.">
+<meta name="twitter:description" content="Ask your coding agent about your LLM app in plain English. lf answers from your Langfuse data: failing traces with their errors, a trace as a tree, cost, latency, prompts and scores.">
 <meta name="twitter:image" content="https://tns15june.github.io/langfuse-agent-cli/lf-timeline.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230C131E'/%3E%3Ctext x='32' y='42' font-family='monospace' font-size='28' font-weight='700' fill='%23F0A748' text-anchor='middle'%3Elf%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -312,7 +312,7 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
       <div class="stat"><b>10 / 10</b><span>plain-English questions answered correctly by fresh Claude Code sessions with only the skill</span></div>
       <div class="stat"><b>352</b><span>unit tests, on Python 3.10, 3.11, 3.12 and 3.13 in CI</span></div>
       <div class="stat"><b>13 / 13</b><span>live tests against the newest Langfuse release in CI, and 4.70 locally</span></div>
-      <div class="stat"><b>4.30–4.70</b><span>Langfuse versions it has run against, metrics included</span></div>
+      <div class="stat"><b>4.30, 4.70</b><span>Langfuse versions lf metrics and lf doctor ran against; the full live suite on 4.70</span></div>
     </div>
     <ul class="checks">
       <li><span>Each agent session had only the skill installed. It picked the skill on its own, chose the commands, and its answer matched the data: the failing tool and its errors, spend by model, tokens per day, a conversation, one user's day, the live prompt version and the scores.</span></li>

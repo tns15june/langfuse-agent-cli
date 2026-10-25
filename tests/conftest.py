@@ -17,6 +17,7 @@ def isolated_config(tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))  # --output-summary files
     monkeypatch.setattr(install_info, "AGENTS_DIR", tmp_path / "home" / ".agents")  # skills installed by lf setup
     monkeypatch.setenv("LF_NO_UPDATE_CHECK", "1")  # doctor's PyPI check; tests that need it unset this
+    monkeypatch.delenv("XDG_STATE_HOME", raising=False)  # the skills CLI keeps its lock there when set
     monkeypatch.chdir(tmp_path)
     for name in [n for n in os.environ if n.startswith("LANGFUSE_")]:
         monkeypatch.delenv(name)

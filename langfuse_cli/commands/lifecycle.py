@@ -4,15 +4,18 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 from langfuse_cli import __version__, install_info
+from langfuse_cli.commands import doctor
+from langfuse_cli.commands.auth import ask
 from langfuse_cli.config import ConfigManager
 
 PACKAGE = install_info.PACKAGE
 UPGRADE = {"uv": ["uv", "tool", "upgrade", PACKAGE], "pipx": ["pipx", "upgrade", PACKAGE]}
 UNINSTALL = {"uv": ["uv", "tool", "uninstall", PACKAGE], "pipx": ["pipx", "uninstall", PACKAGE]}
-SKILL_REMOVE = ["--yes", "skills@1", "remove", "-g", "-y", install_info.SKILL_NAME]
+SKILL_REMOVE = ["npx", "--yes", "skills@1", "remove", "-g", "-y", install_info.SKILL_NAME]
 
 
 def _run(cmd: List[str], exe: Optional[str] = None) -> int:
@@ -33,8 +36,8 @@ def _run(cmd: List[str], exe: Optional[str] = None) -> int:
 def handle_upgrade(args: argparse.Namespace) -> int:
     method = install_info.install_method()
     if method not in UPGRADE:
-        print(f"lf was installed with pip. Upgrade it with: pip install --upgrade {PACKAGE}, then run lf setup.",
-              file=sys.stderr)
+        print(f"lf was not installed with uv or pipx. Upgrade it the way it was installed (with pip: "
+              f"pip install --upgrade {PACKAGE}), then run lf setup.", file=sys.stderr)
         return 1
     print(f"Upgrading lf {__version__}, installed with {method}")
     code = _run(UPGRADE[method])
@@ -43,6 +46,16 @@ def handle_upgrade(args: argparse.Namespace) -> int:
         return 1
     # The same launcher now runs the upgraded lf, which installs the skill of its own version.
     return subprocess.run([install_info.lf_location(), "setup", *(["--yes"] if args.yes else [])]).returncode
+
+
+def _skill_paths() -> List[Path]:
+    """Where the skill still exists: the shared copy and every agent folder doctor knows, links included."""
+    dirs = [install_info.AGENTS_DIR / "skills", *(d for _, d in doctor.KNOWN_SKILL_TARGETS)]
+    paths: List[Path] = []
+    for path in (d / install_info.SKILL_NAME for d in dirs):
+        if (path.is_symlink() or path.exists()) and path not in paths:
+            paths.append(path)
+    return paths
 
 
 def handle_uninstall(args: argparse.Namespace) -> int:
@@ -60,23 +73,43 @@ def handle_uninstall(args: argparse.Namespace) -> int:
         if sys.stdin is None or not sys.stdin.isatty():
             print("Error: lf uninstall deletes files. Run it in a terminal to confirm, or pass --yes.", file=sys.stderr)
             return 1
-        if input("Remove all of these? [y/N] ").strip().lower() not in ("y", "yes"):
+        if (ask("Remove all of these? [y/N] ") or "").lower() not in ("y", "yes"):
             print("Nothing was removed.")
             return 0
 
     failed = False
-    npx, why_not = install_info.find_npx()
-    if npx:
-        failed |= _run(["npx", *SKILL_REMOVE], exe=npx) != 0
+    if not _skill_paths():
+        print("  ✓ The skill is not installed.")
     else:
-        print(f"  ✗ {why_not} Remove the skill yourself: npx skills remove -g {install_info.SKILL_NAME}")
-        failed = True
+        npx, why_not = install_info.find_npx()
+        if npx:
+            _run(SKILL_REMOVE, exe=npx)  # the skills CLI exits 0 even when it could not remove; the disk decides
+        else:
+            print(f"  ✗ {why_not}")
+        left = _skill_paths()
+        if left:
+            print("  ✗ The skill is still at: " + ", ".join(str(p) for p in left))
+            print(f"    Remove it with: npx skills remove -g {install_info.SKILL_NAME}, or delete those folders.")
+            failed = True
+        else:
+            print("  ✓ Skill removed.")
     if profiles.exists():
-        profiles.unlink()
-        print(f"  ✓ Removed {profiles}")
+        try:
+            profiles.unlink()
+            print(f"  ✓ Removed {profiles}")
+        except OSError as e:
+            print(f"  ✗ Could not remove {profiles}: {e.strerror or e}. Delete it yourself; it holds your keys.")
+            failed = True
+    lf_removed = False
     if method in UNINSTALL:
-        failed |= _run(UNINSTALL[method]) != 0
+        lf_removed = _run(UNINSTALL[method]) == 0
+        failed |= not lf_removed
     else:
         print(f"  Remove lf itself with: pip uninstall {PACKAGE}")
-    print("✗ Some steps failed; see above." if failed else "✓ lf is uninstalled.")
+    if failed:
+        print("✗ Some steps failed; see above.")
+    elif lf_removed:
+        print("✓ lf is uninstalled.")
+    else:
+        print(f"✓ The skill and the saved profiles are removed; lf itself stays until you run: pip uninstall {PACKAGE}")
     return 1 if failed else 0

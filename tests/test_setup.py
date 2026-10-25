@@ -4,20 +4,15 @@ import subprocess
 
 import pytest
 import requests
-from helpers import route_doctor
+from helpers import TTY, install_skill, link_skill, route_doctor
 
-from langfuse_cli import __version__, install_info
+from langfuse_cli import __version__
 from langfuse_cli.cli import main
 from langfuse_cli.commands.doctor import SKILL_SOURCE
 from langfuse_cli.config import ConfigManager
 
 FLAGS = ["--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]
 LATER = f"To install it later: npx skills@1 add {SKILL_SOURCE} -g"
-
-
-class TTY(io.StringIO):
-    def isatty(self):
-        return True
 
 
 class Runner:
@@ -51,7 +46,7 @@ def sections(out):
 @pytest.fixture
 def npx(monkeypatch):
     runner = Runner()
-    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/npx" if name == "npx" else None)
+    monkeypatch.setattr(shutil, "which", lambda name, path=None: "/usr/bin/npx" if name == "npx" else None)
     monkeypatch.setattr(subprocess, "run", runner)
     return runner
 
@@ -254,7 +249,7 @@ def test_setup_skill_question_answers(fake_api, monkeypatch, npx, no_skill_dirs,
 def test_setup_exits_1_when_the_skill_cannot_be_installed(fake_api, monkeypatch, capsys, no_prompts, no_skill_dirs,
                                                           tmp_path, npx_path, runner):
     (tmp_path / "skills" / "langfuse-agent-cli").mkdir(parents=True)  # an older copy satisfies doctor
-    monkeypatch.setattr(shutil, "which", lambda name: npx_path)
+    monkeypatch.setattr(shutil, "which", lambda name, path=None: npx_path)
     monkeypatch.setattr(subprocess, "run", runner)
     route_doctor(fake_api)
 
@@ -268,7 +263,7 @@ def test_setup_exits_1_when_the_skill_cannot_be_installed(fake_api, monkeypatch,
 
 def test_setup_ignores_an_npx_in_the_current_folder(fake_api, monkeypatch, capsys, npx, no_prompts, no_skill_dirs,
                                                     tmp_path):
-    monkeypatch.setattr(shutil, "which", lambda name: str(tmp_path / "npx.cmd"))  # tmp_path is the cwd (conftest)
+    monkeypatch.setattr(shutil, "which", lambda name, path=None: str(tmp_path / "npx.cmd"))  # tmp_path is the cwd
     route_doctor(fake_api)
 
     assert main(["setup", "--yes", *FLAGS]) == 1
@@ -296,16 +291,10 @@ def test_doctor_hint_points_to_setup(fake_api, capsys, no_skill_dirs):
     assert f"Run 'lf setup', or: npx skills@1 add {SKILL_SOURCE} -g" in capsys.readouterr().out
 
 
-def install_current_skill(ref=f"v{__version__}"):
-    skill = install_info.AGENTS_DIR / "skills" / "langfuse-agent-cli"
-    skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text("---\nname: langfuse-agent-cli\n---\n")
-    (install_info.AGENTS_DIR / ".skill-lock.json").write_text(
-        '{"skills": {"langfuse-agent-cli": {"ref": "%s"}}}' % ref)
-
-
-def test_setup_skips_the_skill_when_this_version_is_installed(fake_api, capsys, npx, no_prompts, no_skill_dirs):
-    install_current_skill()
+def test_setup_skips_the_skill_when_this_version_is_installed(fake_api, capsys, npx, no_prompts, no_skill_dirs,
+                                                             tmp_path):
+    install_skill()
+    link_skill(tmp_path / "skills")  # the Claude Code folder no_skill_dirs points doctor at
     route_doctor(fake_api)
 
     assert main(["setup", "--yes", *FLAGS]) == 0
@@ -315,7 +304,7 @@ def test_setup_skips_the_skill_when_this_version_is_installed(fake_api, capsys, 
 
 
 def test_setup_replaces_an_older_skill(fake_api, npx, no_prompts, no_skill_dirs):
-    install_current_skill("v0.2.0")
+    install_skill("v0.2.0")
     route_doctor(fake_api)
 
     main(["setup", "--yes", *FLAGS])
@@ -370,3 +359,67 @@ def test_setup_profile_name_without_a_terminal_says_how_to_create_it(fake_api, c
                                                                     no_skill_dirs):
     assert main(["setup", "--yes", "--profile-name", "staging"]) == 1
     assert "lf setup --profile-name staging" in sections(capsys.readouterr().out)[0]
+
+
+def test_setup_reinstalls_when_no_agent_folder_has_the_skill(fake_api, npx, no_prompts, no_skill_dirs):
+    install_skill()  # the shared copy and the lock say "current", but the agent link is gone
+    route_doctor(fake_api)
+
+    main(["setup", "--yes", *FLAGS])
+
+    assert npx.calls
+
+
+def test_setup_yes_with_a_new_profile_name_does_not_claim_success(fake_api, capsys, npx, no_prompts, no_skill_dirs):
+    ConfigManager().save_profile("default", "http://lf.test", "pk", "sk")
+    route_doctor(fake_api)
+
+    code = main(["setup", "--yes", "--profile-name", "staging", "--host", "http://lf.test"])
+
+    out = capsys.readouterr().out
+    assert code == 1
+    assert "Try it" not in out
+    assert "did not create the profile 'staging'" in out.rstrip().splitlines()[-1]
+    assert "staging" not in ConfigManager().list_profiles()
+
+
+def test_setup_shows_the_prompts_again_when_the_skill_is_already_current(fake_api, capsys, npx, no_prompts,
+                                                                         no_skill_dirs, tmp_path):
+    install_skill()
+    link_skill(tmp_path / "skills")
+    route_doctor(fake_api)
+
+    assert main(["setup", "--yes", *FLAGS]) == 0
+    assert "Try it" in sections(capsys.readouterr().out)[2]
+
+
+def test_setup_shows_no_prompts_when_the_skill_was_declined(fake_api, monkeypatch, capsys, npx, no_skill_dirs):
+    monkeypatch.setattr("sys.stdin", TTY())
+    monkeypatch.setattr("builtins.input", lambda prompt="": "n")
+    route_doctor(fake_api)
+
+    assert main(["setup", *FLAGS]) == 0
+    assert "Try it" not in capsys.readouterr().out
+
+
+def test_setup_profile_name_with_rejected_keys_exits_1_without_prompts(fake_api, capsys, npx, no_prompts,
+                                                                       no_skill_dirs):
+    ConfigManager().save_profile("work", "http://lf.test", "pk-old", "sk-old")
+    route_doctor(fake_api, projects_status=401)
+
+    assert main(["setup", "--yes", "--profile-name", "work"]) == 1
+    assert "Try it" not in capsys.readouterr().out
+
+
+def test_setup_treats_end_of_input_at_the_skill_question_as_no(fake_api, monkeypatch, capsys, npx, no_skill_dirs):
+    monkeypatch.setattr("sys.stdin", TTY())
+
+    def eof(prompt=""):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", eof)
+    route_doctor(fake_api)
+
+    assert main(["setup", *FLAGS]) == 0
+    assert npx.calls == []
+    assert LATER in capsys.readouterr().out

@@ -23,8 +23,9 @@ langfuse-agent-cli command, and its agent skill.
    that works, use that path for every command below, and tell the user to add `~/.local/bin` to their
    PATH (`uv tool update-shell` or `pipx ensurepath`).
 3. If it prints "lf 0.4.0" or a later version, go to "Run setup". If it prints an older version, ask the
-   user, run `lf upgrade --yes`, and go to "Verify". If it prints anything else, another program named
-   `lf` is installed: stop and tell the user.
+   user, then upgrade it with the tool that installed it, `uv tool upgrade langfuse-agent-cli` or
+   `pipx upgrade langfuse-agent-cli` (versions before 0.4.0 have no `lf upgrade`), and go to "Run setup".
+   If it prints anything else, another program named `lf` is installed: stop and tell the user.
 
 ## Install
 
@@ -52,7 +53,8 @@ be installed.
 If the credentials are missing or rejected, ask the user to run `lf setup` in their own terminal; it
 asks for the Langfuse host and keys. Environment variables (`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`,
 `LANGFUSE_BASE_URL`) also work, but reach you only if your session starts after they are set. For a
-second Langfuse instance, the user runs `lf setup --profile-name <name> --host <url>`.
+second Langfuse instance, the user runs `lf setup --profile-name <name> --host <url>`; the new profile
+becomes the current one, and `lf auth switch <name>` changes it later.
 
 ## Verify
 

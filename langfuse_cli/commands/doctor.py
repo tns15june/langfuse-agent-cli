@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -56,9 +57,13 @@ def handle_doctor(args: argparse.Namespace) -> int:
     print(f"  CLI Version: {__version__}")
     print(f"  Installed at: {install_info.lf_location()} ({install_info.install_method()})")
     latest = install_info.latest_version()
-    if latest and install_info.is_newer(latest):
+    if os.environ.get("LF_NO_UPDATE_CHECK"):
+        print("  – Update check off (LF_NO_UPDATE_CHECK is set)")
+    elif latest is None:
+        print("  – Could not reach pypi.org to check for a newer version (offline or blocked)")
+    elif install_info.is_newer(latest):
         print(f"  ℹ Version {latest} is available: run 'lf upgrade'")
-    elif latest:
+    else:
         print("  ✓ Latest version")
     print(f"  Python Version: {sys.version.split()[0]}")
     print(f"  Config File: {cfg.config_path} ({'exists' if cfg.config_path.exists() else 'not created yet'})")

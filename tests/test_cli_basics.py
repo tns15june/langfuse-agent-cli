@@ -27,6 +27,18 @@ def test_auth_login_refuses_empty_keys(fake_api, monkeypatch, capsys):
     assert "nothing was saved" in capsys.readouterr().err
 
 
+def test_auth_login_treats_end_of_input_as_no_keys(fake_api, monkeypatch, capsys):
+    def eof(_prompt=""):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", eof)
+    monkeypatch.setattr("getpass.getpass", eof)
+
+    assert main(["auth", "login", "--host", "http://lf.test"]) == 1
+    assert ConfigManager().list_profiles() == {}
+    assert "nothing was saved" in capsys.readouterr().err
+
+
 def test_auth_login_without_default_keeps_the_current_profile(fake_api):
     ConfigManager().save_profile("prod", "http://prod.test", "pk-1", "sk-1")
     fake_api.route("GET", "/api/public/projects", json=load_fixture("projects"))

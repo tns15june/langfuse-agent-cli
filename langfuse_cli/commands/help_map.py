@@ -132,6 +132,8 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
                  "--view <observations|scores-numeric|...>", "--output <json|text>"],
         "rules": [
             "Default window: the last 24 hours. Turn 'today' or 'this week' into ISO timestamps in UTC.",
+            "With --granularity, leave --order-by out: rows come in time order with empty buckets; --order-by drops "
+            "the empty buckets.",
             "Result keys are <aggregation>_<measure>, e.g. sum_totalCost, p95_latency, count_count.",
             "Observation latency here is in milliseconds; trace rows give seconds.",
             "userId, sessionId and traceId work only in --where, not in --by.",

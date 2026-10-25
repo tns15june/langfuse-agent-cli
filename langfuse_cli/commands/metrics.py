@@ -28,23 +28,27 @@ def parse_metrics(spec: str) -> List[Dict[str, str]]:
         if aggregation not in AGGREGATIONS:
             raise ValueError(f"unknown aggregation '{aggregation}' in --metric; use one of {', '.join(AGGREGATIONS)}")
         metrics.append({"measure": measure, "aggregation": aggregation})
+    if not metrics:
+        raise ValueError("--metric needs at least one measure, e.g. totalCost:sum")
     return metrics
 
 
 def parse_filter(expr: str) -> Dict[str, Any]:
     """'level=ERROR' -> an API filter, typed by column."""
-    column, sep, value = expr.partition("=")
-    if not sep or not column or not value:
+    column, _, value = expr.partition("=")
+    if not column or not value:
         raise ValueError(f"--where needs column=value, got '{expr}'")
     if column in BOOLEAN_COLUMNS:
+        if value.lower() not in ("true", "false"):
+            raise ValueError(f"--where {column} takes true or false, got '{value}'")
         return {"column": column, "operator": "=", "value": value.lower() == "true", "type": "boolean"}
     if column in ARRAY_COLUMNS:
         return {"column": column, "operator": "any of", "value": [value], "type": "arrayOptions"}
     if column in NUMBER_COLUMNS:
         try:
-            number: Any = int(value)
+            number: Any = int(value) if value.lstrip("-").isdigit() else float(value)
         except ValueError:
-            number = float(value)
+            raise ValueError(f"--where {column} takes a number, got '{value}'") from None
         return {"column": column, "operator": "=", "value": number, "type": "number"}
     return {"column": column, "operator": "=", "value": value, "type": "string"}
 
@@ -61,7 +65,7 @@ def _iso(moment: datetime) -> str:
 
 
 def build_query(args: argparse.Namespace) -> Dict[str, Any]:
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = datetime.now(timezone.utc)
     query: Dict[str, Any] = {
         "view": args.view,
         "metrics": parse_metrics(args.metric),
@@ -82,9 +86,9 @@ def build_query(args: argparse.Namespace) -> Dict[str, Any]:
 
 def _table(rows: List[Dict[str, Any]]) -> str:
     columns = list(dict.fromkeys(k for row in rows for k in row))
-    cells = [[("-" if row.get(c) is None else str(row.get(c))) for c in columns] for row in rows]
-    widths = [max(len(c), *(len(r[i]) for r in cells)) for i, c in enumerate(columns)]
+    cells = [["-" if row.get(c) is None else str(row[c]) for c in columns] for row in rows]
     lines = [columns, *cells]
+    widths = [max(len(v) for v in column) for column in zip(*lines)]
     return "\n".join("  ".join(v.ljust(w) for v, w in zip(line, widths)).rstrip() for line in lines)
 
 
@@ -95,6 +99,9 @@ def handle_metrics(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     rows = LangfuseClient(resolve_from_args(args)).metrics(query).get("data", [])
+    window = f"{query['fromTimestamp']} to {query['toTimestamp']}"
+    if not args.from_ts and not args.to_ts:  # the default window is easy to miss in the rows
+        print(f"lf: metrics for the last 24 hours ({window}); pass --from-ts for a longer range.", file=sys.stderr)
     limit = query["config"]["row_limit"]
     if len(rows) >= limit:
         print(f"lf: the result has {limit} rows, the --limit; more rows may exist. Narrow the time range or the "
@@ -102,5 +109,5 @@ def handle_metrics(args: argparse.Namespace) -> int:
     if args.output == "json":
         print_json(args, rows)
     else:
-        print(_table(rows) if rows else "No data in this time range.")
+        print(_table(rows) if rows else f"No data from {window}.")
     return 0

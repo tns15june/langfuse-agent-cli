@@ -62,7 +62,8 @@ configured, it asks you to run `lf setup` in your own terminal, which asks for t
 3. **Check.** It runs `lf doctor` and suggests questions to try.
 
 It is safe to run again: steps that are already done are skipped. For a second Langfuse instance, run
-`lf setup --profile-name staging --host https://langfuse.example.com`.
+`lf setup --profile-name staging --host https://langfuse.example.com`; the new profile becomes the
+current one, and `lf auth switch default` switches back.
 
 ### Verify
 

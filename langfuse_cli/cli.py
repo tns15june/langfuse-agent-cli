@@ -222,6 +222,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (LangfuseAPIError, ConfigError, OSError) as e:  # OSError: --file, the profiles file
         print(f"Error: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:  # Ctrl-C at a prompt
+        print("\nInterrupted.", file=sys.stderr)
+        return 130
     finally:
         sys.stdout, sys.stderr = streams
 
