@@ -36,50 +36,6 @@ def prune(data: Any) -> Any:
     return data
 
 
-def compact_trace(trace: Dict[str, Any]) -> Dict[str, Any]:
-    """Produces a minimal, high-signal summary of a Langfuse trace."""
-    latency = None
-    if trace.get("latency") is not None:
-        latency = round(float(trace["latency"]), 3)
-    elif trace.get("duration") is not None:
-        latency = round(float(trace["duration"]), 3)
-
-    cost = None
-    if trace.get("totalCost") is not None:
-        cost = round(float(trace["totalCost"]), 5)
-
-    res: Dict[str, Any] = {
-        "id": trace.get("id"),
-        "name": trace.get("name"),
-        "timestamp": trace.get("timestamp"),
-        "latency_sec": latency,
-        "cost_usd": cost,
-        "sessionId": trace.get("sessionId"),
-        "userId": trace.get("userId"),
-        "tags": trace.get("tags") or [],
-    }
-
-    # Inspect observations for errors or key model details
-    observations = trace.get("observations") or []
-    errors = []
-    models_used = set()
-    for obs in observations:
-        if isinstance(obs, dict):
-            if obs.get("level") == "ERROR" or obs.get("statusMessage"):
-                err_text = obs.get("statusMessage") or obs.get("name")
-                if err_text:
-                    errors.append(f"{obs.get('name')}: {err_text}")
-            if obs.get("model"):
-                models_used.add(obs["model"])
-
-    if errors:
-        res["errors"] = errors
-    if models_used:
-        res["models"] = list(models_used)
-
-    return {k: v for k, v in res.items() if v is not None}
-
-
 def format_agent_output(
     data: Any,
     compact: bool = False,

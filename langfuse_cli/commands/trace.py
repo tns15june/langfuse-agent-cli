@@ -1,106 +1,80 @@
-"""Trace and observability commands for Langfuse."""
+"""Trace commands, read through the observations v2 API (the only trace read path on Langfuse v4)."""
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, Iterable, List
 
-from langfuse_cli.client import LangfuseClient, LangfuseAPIError
+from langfuse_cli.client import LangfuseClient
 from langfuse_cli.config import resolve_from_args
-from langfuse_cli.formatters.agent import format_agent_output, compact_trace
+from langfuse_cli.formatters.agent import format_agent_output
 from langfuse_cli.formatters.timeline import render_trace_timeline
+
+ROOT_FIELDS = "core,basic"  # a trace is listed as its root observation
+TREE_FIELDS = "core,basic,time,model,usage"  # everything except inputs/outputs; --io adds them
+
+
+def group_errors(observations: Iterable[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
+    """ERROR observations grouped by trace in first-seen order, at most `limit` traces."""
+    groups: Dict[Any, Dict[str, Any]] = {}
+    for obs in observations:
+        trace_id = obs.get("traceId")
+        if trace_id not in groups:
+            if len(groups) == limit:
+                break  # stops the lazy page iterator too
+            groups[trace_id] = {"traceId": trace_id, "sessionId": obs.get("sessionId"),
+                                "userId": obs.get("userId"), "errors": []}
+        groups[trace_id]["errors"].append({k: obs.get(k) for k in ("id", "name", "type", "statusMessage", "startTime")})
+    return list(groups.values())
+
+
+def _trace_line(row: Dict[str, Any]) -> str:
+    latency = f" ({float(row['latency']):.2f}s)" if row.get("latency") is not None else ""
+    return f"  - [{row.get('traceId')}] {row.get('name') or 'unnamed'}{latency} @ {row.get('startTime')}"
+
+
+def _emit(args: argparse.Namespace, rows: List[Dict[str, Any]], lines: List[str], empty: str) -> int:
+    if args.output == "json":
+        print(format_agent_output(rows, compact=args.compact, agent_fields=args.agent_fields))
+    else:
+        print("\n".join(lines) if lines else empty)
+    return 0
+
+
+def _by_start(obs: Dict[str, Any]) -> str:
+    return obs.get("startTime") or ""
 
 
 def handle_trace(args: argparse.Namespace) -> int:
-    prof = resolve_from_args(args)
-    client = LangfuseClient(prof)
-    action = getattr(args, "trace_action", "list")
-    out_format = getattr(args, "output", "json")
-    compact = getattr(args, "compact", False)
-    agent_fields = getattr(args, "agent_fields", None)
+    client = LangfuseClient(resolve_from_args(args))
 
-    try:
-        if action == "list":
-            limit = getattr(args, "limit", 20)
-            session_id = getattr(args, "session_id", None)
-            user_id = getattr(args, "user_id", None)
-            from_ts = getattr(args, "from_ts", None)
-            to_ts = getattr(args, "to_ts", None)
+    if args.trace_action == "list":
+        filters = {"sessionId": args.session_id, "userId": args.user_id,
+                   "fromStartTime": args.from_ts, "toStartTime": args.to_ts}
+        if args.status == "error":
+            # shortcut: scans at most 5000 error rows; raise the cap if busy projects need longer windows
+            errors = client.iter_observations({**filters, "level": "ERROR", "fields": ROOT_FIELDS}, max_items=5000)
+            rows = group_errors(errors, args.limit)
+            lines = [f"  - [{g['traceId']}] {len(g['errors'])} error(s): "
+                     + "; ".join(f"{e['name']}: {e['statusMessage']}" for e in g["errors"]) for g in rows]
+            return _emit(args, rows, lines, "No traces with errors found.")
+        rows = client.list_observations(**filters, isRootObservation=True, fields=ROOT_FIELDS, limit=args.limit)
+        rows = rows.get("data", [])
+        return _emit(args, rows, [_trace_line(r) for r in rows], "No traces found.")
 
-            res = client.list_traces(
-                limit=limit,
-                session_id=session_id,
-                user_id=user_id,
-                from_ts=from_ts,
-                to_ts=to_ts,
-            )
-            traces = res.get("data", [])
+    if args.trace_action == "get":
+        fields = TREE_FIELDS + (",io" if args.io else "")
+        observations = sorted(client.iter_observations({"traceId": args.trace_id, "fields": fields}), key=_by_start)
+        if not observations:
+            print(f"Error: trace {args.trace_id} not found", file=sys.stderr)
+            return 1
+        if args.timeline or args.output == "text":
+            print(render_trace_timeline(args.trace_id, observations))
+        else:
+            print(format_agent_output(observations, compact=args.compact, agent_fields=args.agent_fields))
+        return 0
 
-            # Filter by status if requested (e.g. error)
-            status_filter = getattr(args, "status", None)
-            if status_filter == "error":
-                filtered = []
-                for t in traces:
-                    ct = compact_trace(t)
-                    if ct.get("errors"):
-                        filtered.append(t)
-                traces = filtered
-
-            if out_format == "json":
-                print(format_agent_output(traces, compact=compact, agent_fields=agent_fields))
-            else:
-                if not traces:
-                    print("No traces found matching criteria.")
-                    return 0
-                print(f"Traces ({len(traces)}):")
-                for t in traces:
-                    tid = t.get("id")
-                    tname = t.get("name", "unnamed")
-                    ts = t.get("timestamp", "N/A")
-                    lat = t.get("latency") or t.get("duration")
-                    lat_str = f" ({float(lat):.2f}s)" if lat else ""
-                    print(f"  - [{tid}] {tname}{lat_str} @ {ts}")
-            return 0
-
-        elif action == "get":
-            trace_id = args.trace_id
-            trace = client.get_trace(trace_id=trace_id)
-
-            if getattr(args, "timeline", False) or out_format == "text":
-                print(render_trace_timeline(trace))
-            else:
-                print(format_agent_output(trace, compact=compact, agent_fields=agent_fields))
-            return 0
-
-        elif action == "session":
-            session_id = args.session_id
-            # Fetch session metadata and associated traces
-            session_meta = {}
-            try:
-                session_meta = client.get_session(session_id)
-            except Exception:
-                pass
-            traces_res = client.list_traces(session_id=session_id, limit=50)
-            traces = traces_res.get("data", [])
-
-            payload = {
-                "sessionId": session_id,
-                "session": session_meta,
-                "traces_count": len(traces),
-                "traces": [compact_trace(t) for t in traces] if compact else traces,
-            }
-
-            if out_format == "json":
-                print(json.dumps(payload, indent=2))
-            else:
-                print(f"Session: {session_id} ({len(traces)} traces recorded)")
-                for t in traces:
-                    print(f"  - [{t.get('id')}] {t.get('name')} @ {t.get('timestamp')}")
-            return 0
-
-    except LangfuseAPIError as e:
-        print(f"API Error: {e}", file=sys.stderr)
-        return 1
-
-    return 0
+    # session: its traces, oldest first, so a conversation reads top to bottom
+    rows = sorted(client.iter_observations(
+        {"sessionId": args.session_id, "isRootObservation": True, "fields": ROOT_FIELDS}, max_items=1000), key=_by_start)
+    return _emit(args, rows, [_trace_line(r) for r in rows], f"No traces in session {args.session_id}.")

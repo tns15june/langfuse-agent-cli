@@ -118,6 +118,7 @@ def create_parser() -> argparse.ArgumentParser:
     p_trace_get = trace_sub.add_parser("get", parents=[common_parser], help="Get trace details")
     p_trace_get.add_argument("trace_id", help="Trace ID")
     p_trace_get.add_argument("--timeline", action="store_true", help="Display visual timeline tree")
+    p_trace_get.add_argument("--io", action="store_true", help="Include observation inputs and outputs (large)")
 
     p_trace_session = trace_sub.add_parser("session", parents=[common_parser], help="Get traces for an entire session")
     p_trace_session.add_argument("session_id", help="Session ID")
