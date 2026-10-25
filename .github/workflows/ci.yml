@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"  # weekly, to catch Langfuse API changes between our own commits
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest -q
+
+  live:
+    # Runs the CLI against the latest Langfuse release, started from its official docker compose file.
+    runs-on: ubuntu-latest
+    env:
+      LANGFUSE_INIT_ORG_ID: ci
+      LANGFUSE_INIT_ORG_NAME: ci
+      LANGFUSE_INIT_PROJECT_ID: ci
+      LANGFUSE_INIT_PROJECT_NAME: ci
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-ci-public
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-ci-secret
+      LANGFUSE_BASE_URL: http://localhost:3000
+      LANGFUSE_PUBLIC_KEY: pk-lf-ci-public
+      LANGFUSE_SECRET_KEY: sk-lf-ci-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Start the latest Langfuse release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh api repos/langfuse/langfuse/releases/latest --jq .tag_name)
+          echo "Langfuse $tag"
+          curl -fsSL -o docker-compose.yml "https://raw.githubusercontent.com/langfuse/langfuse/$tag/docker-compose.yml"
+          docker compose up -d
+          for _ in $(seq 1 60); do
+            curl -fs http://localhost:3000/api/public/health && exit 0
+            sleep 5
+          done
+          echo "Langfuse did not become healthy within 300s" && exit 1
+      - run: pip install -e ".[dev]" langfuse
+      - name: Seed synthetic data
+        run: python scripts/seed_langfuse.py
+      - name: Live tests
+        run: LF_LIVE=1 pytest tests/test_live.py -v
+      - name: Langfuse logs
+        if: failure()
+        run: docker compose logs --tail 200
