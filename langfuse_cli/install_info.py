@@ -28,15 +28,22 @@ def install_method(prefix: str = sys.prefix) -> str:
     return "pip"
 
 
+def find_tool(name: str) -> Tuple[Optional[str], str]:
+    """The program to run, or (None, why not)."""
+    path = shutil.which(name)
+    if path is None:
+        return None, f"{name} not found"
+    # On Windows, which() searches the current folder first; never run a program a project folder supplies.
+    if os.path.normcase(os.path.realpath(os.path.dirname(path))) == os.path.normcase(os.path.realpath(os.getcwd())):
+        return None, f"Not running {path}: it is in the current folder. Run lf from another folder."
+    return path, ""
+
+
 def find_npx() -> Tuple[Optional[str], str]:
-    """The npx to run, or (None, why not)."""
-    npx = shutil.which("npx")
-    if npx is None:
-        return None, "npx not found; the skills CLI needs Node.js 22.20 or later."
-    # On Windows, which() searches the current folder first; never run an npx that a project folder supplies.
-    if os.path.normcase(os.path.realpath(os.path.dirname(npx))) == os.path.normcase(os.path.realpath(os.getcwd())):
-        return None, f"Not running {npx}: it is in the current folder. Run lf from another folder."
-    return npx, ""
+    npx, why_not = find_tool("npx")
+    if npx is None and why_not == "npx not found":
+        why_not = "npx not found; the skills CLI needs Node.js 22.20 or later."
+    return npx, why_not
 
 
 def lf_location() -> str:

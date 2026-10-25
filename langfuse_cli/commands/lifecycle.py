@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import subprocess
 import sys
-from typing import List
+from typing import List, Optional
 
 from langfuse_cli import __version__, install_info
 from langfuse_cli.config import ConfigManager
@@ -16,12 +15,13 @@ UNINSTALL = {"uv": ["uv", "tool", "uninstall", PACKAGE], "pipx": ["pipx", "unins
 SKILL_REMOVE = ["--yes", "skills@1", "remove", "-g", "-y", install_info.SKILL_NAME]
 
 
-def _run(cmd: List[str]) -> int:
-    """Run an installer command shown to the user first; a missing program counts as a failure."""
-    exe = shutil.which(cmd[0])
+def _run(cmd: List[str], exe: Optional[str] = None) -> int:
+    """Run an installer command, shown to the user first; a missing or refused program counts as a failure."""
     if exe is None:
-        print(f"  ✗ {cmd[0]} not found")
-        return 127
+        exe, why_not = install_info.find_tool(cmd[0])
+        if exe is None:
+            print(f"  ✗ {why_not}")
+            return 127
     print(f"  Running: {' '.join(cmd)}", flush=True)
     try:
         return subprocess.run([exe, *cmd[1:]]).returncode
@@ -41,9 +41,8 @@ def handle_upgrade(args: argparse.Namespace) -> int:
     if code:
         print(f"✗ The upgrade failed (exit code {code}); lf {__version__} is unchanged.")
         return 1
-    # The upgraded lf installs the skill of its own version and checks the connection.
-    new_lf = shutil.which("lf") or install_info.lf_location()
-    return subprocess.run([new_lf, "setup", *(["--yes"] if args.yes else [])]).returncode
+    # The same launcher now runs the upgraded lf, which installs the skill of its own version.
+    return subprocess.run([install_info.lf_location(), "setup", *(["--yes"] if args.yes else [])]).returncode
 
 
 def handle_uninstall(args: argparse.Namespace) -> int:
@@ -68,7 +67,7 @@ def handle_uninstall(args: argparse.Namespace) -> int:
     failed = False
     npx, why_not = install_info.find_npx()
     if npx:
-        failed |= _run(["npx", *SKILL_REMOVE]) != 0
+        failed |= _run(["npx", *SKILL_REMOVE], exe=npx) != 0
     else:
         print(f"  ✗ {why_not} Remove the skill yourself: npx skills remove -g {install_info.SKILL_NAME}")
         failed = True

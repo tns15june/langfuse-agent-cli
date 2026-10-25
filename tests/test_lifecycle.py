@@ -29,10 +29,11 @@ class Runner:
 
 @pytest.fixture
 def tools(monkeypatch):
-    """uv, pipx, npx and lf all on PATH under /usr/bin (lf under ~/.local/bin); subprocess.run recorded."""
+    """uv, pipx and npx on PATH under /usr/bin, the running lf under ~/.local/bin; subprocess.run recorded."""
     runner = Runner()
-    paths = {"uv": "/usr/bin/uv", "pipx": "/usr/bin/pipx", "npx": "/usr/bin/npx", "lf": LF}
+    paths = {"uv": "/usr/bin/uv", "pipx": "/usr/bin/pipx", "npx": "/usr/bin/npx"}
     monkeypatch.setattr(shutil, "which", lambda name: paths.get(name))
+    monkeypatch.setattr(install_info, "lf_location", lambda: LF)
     monkeypatch.setattr(subprocess, "run", runner)
     return runner
 
@@ -163,3 +164,31 @@ def test_uninstall_of_a_pip_install_says_how_to_remove_lf(monkeypatch, capsys, t
 
     assert "pip uninstall langfuse-agent-cli" in capsys.readouterr().out
     assert all("uninstall" not in " ".join(call) for call in tools.calls)
+
+
+def test_upgrade_never_runs_an_installer_from_the_current_folder(monkeypatch, capsys, tools, tmp_path):
+    method(monkeypatch, "uv")
+    monkeypatch.setattr(shutil, "which", lambda name: str(tmp_path / f"{name}.exe"))  # tmp_path is the cwd
+
+    assert main(["upgrade", "--yes"]) == 1
+
+    assert tools.calls == []
+    assert "current folder" in capsys.readouterr().out
+
+
+def test_upgrade_runs_setup_with_the_lf_it_was_started_from(monkeypatch, tools):
+    method(monkeypatch, "uv")
+    monkeypatch.setattr(shutil, "which", lambda name: {"uv": "/usr/bin/uv", "lf": "/opt/other/lf"}.get(name))
+
+    main(["upgrade", "--yes"])
+
+    assert tools.calls[-1] == [LF, "setup", "--yes"]
+
+
+def test_uninstall_runs_the_npx_it_checked(monkeypatch, tools):
+    method(monkeypatch, "uv")
+    monkeypatch.setattr(install_info, "find_npx", lambda: ("/opt/node/bin/npx", ""))
+
+    main(["uninstall", "--yes"])
+
+    assert tools.calls[0][0] == "/opt/node/bin/npx"
