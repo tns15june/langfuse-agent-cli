@@ -159,3 +159,38 @@ def test_limit_outside_1_to_1000_is_rejected(limit):
     with pytest.raises(SystemExit) as exc:
         main(["metrics", "--limit", limit, *FLAGS])
     assert exc.value.code == 2
+
+
+def test_time_series_default_to_the_largest_row_limit(fake_api, capsys):
+    # A week in hours is 168 buckets: at the API's 100-row default the newest hours went missing.
+    fake_api.route("GET", METRICS, json={"data": []})
+
+    run(capsys, "metrics", "--where", "level=ERROR", "--granularity", "hour", *WEEK)
+
+    assert sent_query(fake_api)["config"] == {"row_limit": 1000}
+
+
+def test_an_explicit_limit_wins_over_the_time_series_default(fake_api, capsys):
+    fake_api.route("GET", METRICS, json={"data": []})
+
+    run(capsys, "metrics", "--granularity", "hour", "--limit", "50", *WEEK)
+
+    assert sent_query(fake_api)["config"] == {"row_limit": 50}
+
+
+def test_a_result_at_the_row_limit_warns_that_rows_may_be_missing(fake_api, capsys):
+    fake_api.route("GET", METRICS, json={"data": [{"name": f"step-{i}", "count_count": 1} for i in range(5)]})
+
+    code, out, err = run(capsys, "metrics", "--by", "name", "--limit", "5", *WEEK)
+
+    assert code == 0
+    assert len(json.loads(out)) == 5
+    assert "5 rows" in err and "--limit" in err
+
+
+def test_a_result_under_the_row_limit_does_not_warn(fake_api, capsys):
+    fake_api.route("GET", METRICS, json={"data": [{"name": "a", "count_count": 1}]})
+
+    _, _, err = run(capsys, "metrics", "--by", "name", *WEEK)
+
+    assert err == ""

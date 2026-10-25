@@ -69,7 +69,8 @@ def build_query(args: argparse.Namespace) -> Dict[str, Any]:
         "filters": [parse_filter(expr) for expr in args.where or []],
         "fromTimestamp": args.from_ts or _iso(now - timedelta(hours=24)),
         "toTimestamp": args.to_ts or _iso(now),
-        "config": {"row_limit": args.limit},
+        # A time series needs every bucket (a week in hours is 168); the API returns only 100 rows by default.
+        "config": {"row_limit": args.limit or (1000 if args.granularity else 100)},
     }
     if args.granularity:
         query["timeDimension"] = {"granularity": args.granularity}
@@ -94,6 +95,10 @@ def handle_metrics(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     rows = LangfuseClient(resolve_from_args(args)).metrics(query).get("data", [])
+    limit = query["config"]["row_limit"]
+    if len(rows) >= limit:
+        print(f"lf: the result has {limit} rows, the --limit; more rows may exist. Narrow the time range or the "
+              "groups, or raise --limit (up to 1000).", file=sys.stderr)
     if args.output == "json":
         print_json(args, rows)
     else:

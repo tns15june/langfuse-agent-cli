@@ -169,7 +169,8 @@ def create_parser() -> argparse.ArgumentParser:
     p_metrics.add_argument("--to-ts", help="End, ISO-8601 (default: now)")
     p_metrics.add_argument("--order-by", help="Result field to sort by, e.g. sum_totalCost or p95_latency:asc "
                                               "(default direction: desc)")
-    p_metrics.add_argument("--limit", type=row_limit, default=100, help="Maximum rows, 1-1000 (default: 100)")
+    p_metrics.add_argument("--limit", type=row_limit,
+                           help="Maximum rows, 1-1000 (default: 100, or 1000 with --granularity)")
 
     # 7. Score command
     p_score = subparsers.add_parser("score", parents=[common_parser], help="Record evaluation scores")

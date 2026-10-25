@@ -42,7 +42,8 @@ People ask in plain English; you answer with `lf`, which reads Langfuse through 
 | "How are our eval scores?" | `lf metrics --view scores-numeric --metric value --by name --from-ts <start>` |
 | "Is lf set up?" "Langfuse errors" | `lf doctor` |
 
-`lf metrics` counts by default and covers the last 24 hours unless you pass `--from-ts`. Turn
+Go straight to the command; run `lf doctor` only when a command fails. `lf metrics` counts by
+default and covers the last 24 hours unless you pass `--from-ts`. Turn
 "today", "this week" or "since Monday" into ISO timestamps in UTC, such as `2026-10-20T00:00:00Z`.
 More worked examples: `references/EXAMPLES.md`.
 
