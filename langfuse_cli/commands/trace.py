@@ -10,8 +10,9 @@ from langfuse_cli.config import resolve_from_args
 from langfuse_cli.formatters.agent import format_agent_output
 from langfuse_cli.formatters.timeline import render_trace_timeline
 
-ROOT_FIELDS = "core,basic"  # a trace is listed as its root observation
-TREE_FIELDS = "core,basic,time,model,usage"  # everything except inputs/outputs; --io adds them
+# Field groups of GET /api/public/v2/observations. "metrics" carries latency; the spec puts it there.
+ROOT_FIELDS = "core,basic,metrics"  # a trace is listed as its root observation
+TREE_FIELDS = "core,basic,time,model,usage,metrics"  # leaves out io (--io adds it), metadata, prompt, trace_context
 
 
 def group_errors(observations: Iterable[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:

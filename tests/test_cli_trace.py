@@ -28,7 +28,7 @@ def test_trace_list_reads_root_observations(fake_api, capsys):
 
     assert code == 0
     assert json.loads(out) == load_fixture("obs_roots")["data"]
-    assert fake_api.calls[-1][2] == {"isRootObservation": "true", "fields": "core,basic", "limit": "5"}
+    assert fake_api.calls[-1][2] == {"isRootObservation": "true", "fields": "core,basic,metrics", "limit": "5"}
 
 
 def test_trace_list_maps_filters_to_v2_names(fake_api, capsys):
@@ -82,7 +82,7 @@ def test_trace_get_timeline_shows_error(fake_api, capsys):
     assert code == 0
     assert "  ✗ [ERROR] TOOL search_tool_call [0ms]" in out.splitlines()
     assert fake_api.calls[-1][2]["traceId"] == ERROR_TRACES[0]
-    assert fake_api.calls[-1][2]["fields"] == "core,basic,time,model,usage"
+    assert fake_api.calls[-1][2]["fields"] == "core,basic,time,model,usage,metrics"
 
 
 def test_trace_get_json_is_observations_in_start_order(fake_api, capsys):
@@ -98,7 +98,7 @@ def test_trace_get_io_requests_io_group(fake_api, capsys):
 
     run(capsys, "trace", "get", ERROR_TRACES[0], "--io")
 
-    assert fake_api.calls[-1][2]["fields"] == "core,basic,time,model,usage,io"
+    assert fake_api.calls[-1][2]["fields"] == "core,basic,time,model,usage,metrics,io"
 
 
 def test_trace_get_unknown_id_exits_1(fake_api, capsys):

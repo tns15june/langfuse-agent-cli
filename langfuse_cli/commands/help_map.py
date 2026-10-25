@@ -74,7 +74,10 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
         "desc": "All observations of one trace; --timeline renders them as a tree",
         "write": False,
         "opts": ["<trace_id>", "--timeline", "--io", "--compact", "--agent-fields <paths>"],
-        "rules": ["Inputs and outputs are left out unless --io is given; they are often large."],
+        "rules": [
+            "Inputs and outputs are left out unless --io is given; they are often large.",
+            "Metadata, prompt links and trace tags are not fetched.",
+        ],
     },
     "trace session": {
         "desc": "Traces of one session, oldest first",
