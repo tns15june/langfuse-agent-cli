@@ -85,3 +85,10 @@ def test_prompt_push_missing_file_is_a_clean_error(fake_api, capsys):
     captured = capsys.readouterr()
     assert (captured.out, fake_api.calls) == ("", [])
     assert captured.err.startswith("Error: ") and "missing.txt" in captured.err
+
+
+def test_auth_switch_unknown_profile_reports_on_stderr(capsys):
+    assert main(["auth", "switch", "nope"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "nope" in captured.err

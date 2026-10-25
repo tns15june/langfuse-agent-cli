@@ -17,6 +17,8 @@ KNOWN_SKILL_TARGETS = [
     ("Cursor", Path.home() / ".cursor" / "skills"),
     ("OpenCode", Path.home() / ".config" / "opencode" / "skills"),
 ]
+# `npx skills add` installs into the current project unless given -g
+PROJECT_SKILL_DIRS = [Path(".claude") / "skills", Path(".agents") / "skills"]
 
 
 def _check_server(client: LangfuseClient) -> bool:
@@ -66,7 +68,8 @@ def handle_doctor(args: argparse.Namespace) -> int:
 
     print("\n3. Agent Skill")
     skills_found = 0
-    for name, target_dir in KNOWN_SKILL_TARGETS:
+    project_targets = [(f"Project {d.parent}", Path.cwd() / d) for d in PROJECT_SKILL_DIRS]
+    for name, target_dir in KNOWN_SKILL_TARGETS + project_targets:
         skill_path = target_dir / SKILL_NAME
         if skill_path.exists():
             skills_found += 1
@@ -81,5 +84,5 @@ def handle_doctor(args: argparse.Namespace) -> int:
     if skills_found:
         print("  ✓ All checks passed.")
     else:
-        print("  ℹ Skill not installed. Install it with: npx skills add tns15june/langfuse-agent-cli")
+        print("  ℹ Skill not installed. For all projects: npx skills add tns15june/langfuse-agent-cli -g")
     return 0

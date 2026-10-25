@@ -46,7 +46,7 @@ def handle_auth(args: argparse.Namespace) -> int:
         target = args.target_profile
         profiles = cfg.list_profiles()
         if target not in profiles:
-            print(f"Error: Profile '{target}' not found. Available profiles: {list(profiles.keys())}")
+            print(f"Error: Profile '{target}' not found. Available profiles: {list(profiles.keys())}", file=sys.stderr)
             return 1
         cfg.set_current_profile(target)
         print(f"✓ Active profile switched to '{target}'.")

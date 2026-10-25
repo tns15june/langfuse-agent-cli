@@ -179,3 +179,14 @@ def test_prompt_push_chat_file_must_be_json(fake_api, capsys, tmp_path):
 
     assert (code, out, fake_api.calls) == (1, "", [])
     assert err.startswith("Error: ")
+
+
+def test_doctor_finds_a_project_level_skill(fake_api, capsys, no_skill_dirs, tmp_path):
+    # `npx skills add` installs into the current project by default (tmp_path is the cwd, see conftest).
+    (tmp_path / ".claude" / "skills" / "langfuse-agent-cli").mkdir(parents=True)
+    route_doctor(fake_api)
+
+    code, out, _ = run(capsys, "doctor")
+
+    assert code == 0
+    assert "All checks passed." in out
