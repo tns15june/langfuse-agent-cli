@@ -7,8 +7,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any
-
+from typing import Any, Dict, Optional
 
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "langfuse"
 DEFAULT_PROFILES_FILE = DEFAULT_CONFIG_DIR / "profiles.json"

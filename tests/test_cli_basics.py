@@ -26,7 +26,8 @@ def test_api_error_html_body_is_not_printed(fake_api, capsys):
     fake_api.route("GET", "/api/public/v2/prompts/missing", status=404,
                    text="<!DOCTYPE html><html><body>404</body></html>", content_type="text/html")
 
-    assert main(["prompt", "get", "missing", "--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]) == 1
+    flags = ["--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]
+    assert main(["prompt", "get", "missing", *flags]) == 1
     err = capsys.readouterr().err
     assert "HTTP 404" in err
     assert "<html" not in err

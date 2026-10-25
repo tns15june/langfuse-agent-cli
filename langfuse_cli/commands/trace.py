@@ -75,6 +75,6 @@ def handle_trace(args: argparse.Namespace) -> int:
         return 0
 
     # session: its traces, oldest first, so a conversation reads top to bottom
-    rows = sorted(client.iter_observations(
-        {"sessionId": args.session_id, "isRootObservation": True, "fields": ROOT_FIELDS}, max_items=1000), key=_by_start)
+    params = {"sessionId": args.session_id, "isRootObservation": True, "fields": ROOT_FIELDS}
+    rows = sorted(client.iter_observations(params, max_items=1000), key=_by_start)
     return _emit(args, rows, [_trace_line(r) for r in rows], f"No traces in session {args.session_id}.")

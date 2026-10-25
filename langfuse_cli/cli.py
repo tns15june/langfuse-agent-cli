@@ -3,18 +3,18 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Optional, List
+from typing import List, Optional
 
 from langfuse_cli import __version__
 from langfuse_cli.client import LangfuseAPIError
-from langfuse_cli.config import ConfigError
 from langfuse_cli.commands.auth import handle_auth
-from langfuse_cli.commands.doctor import handle_doctor
-from langfuse_cli.commands.prompt import handle_prompt
-from langfuse_cli.commands.trace import handle_trace
 from langfuse_cli.commands.dataset import handle_dataset
+from langfuse_cli.commands.doctor import handle_doctor
+from langfuse_cli.commands.help_map import handle_help_describe, handle_help_map
+from langfuse_cli.commands.prompt import handle_prompt
 from langfuse_cli.commands.score import handle_score
-from langfuse_cli.commands.help_map import handle_help_map, handle_help_describe
+from langfuse_cli.commands.trace import handle_trace
+from langfuse_cli.config import ConfigError
 from langfuse_cli.formatters import clean
 
 # Common options use argparse.SUPPRESS so a subcommand's default never overwrites a value given
@@ -46,18 +46,20 @@ class _SafeStream:
 
 def create_parser() -> argparse.ArgumentParser:
     common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("-p", "--profile", default=argparse.SUPPRESS, help="Active profile name (from ~/.config/langfuse/profiles.json)")
-    common_parser.add_argument("--host", default=argparse.SUPPRESS, help="Langfuse server host (e.g. http://localhost:3000)")
-    common_parser.add_argument("--public-key", default=argparse.SUPPRESS, help="Langfuse public key (pk-lf-...)")
-    common_parser.add_argument("--secret-key", default=argparse.SUPPRESS, help="Langfuse secret key (sk-lf-...)")
-    common_parser.add_argument("--env-file", default=argparse.SUPPRESS, help="Path to custom .env file to load credentials from")
-    common_parser.add_argument("-o", "--output", choices=["json", "text"], default=argparse.SUPPRESS, help="Output format (default: json)")
-    common_parser.add_argument("--compact", action="store_true", default=argparse.SUPPRESS, help="Format JSON with compact, token-efficient fields for agents")
-    common_parser.add_argument("--agent-fields", default=argparse.SUPPRESS, help="Comma-separated field paths to extract in JSON output")
+    common = common_parser.add_argument
+    unset = argparse.SUPPRESS  # defaults come from COMMON_DEFAULTS
+    common("-p", "--profile", default=unset, help="Saved profile to use (see 'lf auth list')")
+    common("--host", default=unset, help="Langfuse host, e.g. http://localhost:3000")
+    common("--public-key", default=unset, help="Langfuse public key (pk-lf-...)")
+    common("--secret-key", default=unset, help="Langfuse secret key (sk-lf-...); prefer env vars or a profile")
+    common("--env-file", default=unset, help="Read LANGFUSE_* credentials from this .env file")
+    common("-o", "--output", choices=["json", "text"], default=unset, help="Output format (default: json)")
+    common("--compact", action="store_true", default=unset, help="Drop null and empty fields from JSON output")
+    common("--agent-fields", default=unset, help="Comma-separated field paths to keep in JSON output")
 
     parser = argparse.ArgumentParser(
         prog="lf",
-        description="Agent-native CLI and companion skills for Langfuse observability and prompt engineering.",
+        description="Agent-oriented CLI for Langfuse traces, prompts, datasets and scores.",
         parents=[common_parser],
     )
     parser.add_argument("-v", "--version", action="version", version=f"lf {__version__}")
@@ -78,7 +80,7 @@ def create_parser() -> argparse.ArgumentParser:
     auth_sub.add_parser("status", parents=[common_parser], help="Check current profile status and connectivity")
 
     # 2. Doctor command
-    subparsers.add_parser("doctor", parents=[common_parser], help="Run end-to-end diagnostics on auth, host, and skills")
+    subparsers.add_parser("doctor", parents=[common_parser], help="Check credentials, server and the agent skill")
 
     # 3. Prompt command
     p_prompt = subparsers.add_parser("prompt", parents=[common_parser], help="Inspect and manage prompt versions")

@@ -5,8 +5,8 @@ import argparse
 import getpass
 import sys
 
+from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.config import ConfigManager, resolve_from_args
-from langfuse_cli.client import LangfuseClient, LangfuseAPIError
 
 
 def handle_auth(args: argparse.Namespace) -> int:

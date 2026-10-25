@@ -59,7 +59,8 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
     "prompt push": {
         "desc": "Create a new prompt version",
         "write": True,
-        "opts": ["<name>", "--text '<prompt>'", "--file <path>", "--type <text|chat>", "--labels <a,b>", "--tags <a,b>"],
+        "opts": ["<name>", "--text '<prompt>'", "--file <path>", "--type <text|chat>", "--labels <a,b>",
+                 "--tags <a,b>"],
         "rules": ["Read the current version with 'prompt get' first and tell the user what will change."],
     },
     "trace list": {

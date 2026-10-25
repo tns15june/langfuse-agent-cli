@@ -1,7 +1,7 @@
 """REST API client for Langfuse."""
 from __future__ import annotations
 
-from typing import Optional, Dict, Any, Iterator, List
+from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import quote
 
 import requests

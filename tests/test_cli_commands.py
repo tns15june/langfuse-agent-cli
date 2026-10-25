@@ -32,7 +32,8 @@ def test_prompt_push_json_stdout_is_one_document(fake_api, capsys):
 
     assert code == 0
     assert json.loads(out)["version"] == 1
-    assert fake_api.bodies[-1] == {"name": "greeter-test", "type": "text", "prompt": "Hi {{user_name}}", "labels": ["staging"]}
+    assert fake_api.bodies[-1] == {
+        "name": "greeter-test", "type": "text", "prompt": "Hi {{user_name}}", "labels": ["staging"]}
 
 
 def test_score_create_json_stdout_is_one_document(fake_api, capsys):
