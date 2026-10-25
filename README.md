@@ -1,8 +1,8 @@
 # langfuse-agent-cli (`lf`)
 
 Command-line access to [Langfuse](https://langfuse.com) traces, prompts, datasets and scores, shaped
-for AI coding agents: compact JSON by default, failing traces with their error messages in one
-command, a trace as a tree, and an agent skill that teaches the commands.
+for AI coding agents: JSON by default (`--compact` trims it), failing traces with their error messages
+in one command, a trace as a tree, and an agent skill that teaches the commands.
 
 > **Status: prototype.** Langfuse ships an official CLI,
 > [`@langfuse/cli`](https://github.com/langfuse/langfuse-cli), which covers the whole API, and official
@@ -24,10 +24,11 @@ pipx install git+https://github.com/tns15june/langfuse-agent-cli
 uv tool install git+https://github.com/tns15june/langfuse-agent-cli
 ```
 
-The agent skill (`langfuse-agent-cli`) installs with the [skills CLI](https://github.com/vercel-labs/skills):
+The agent skill (`langfuse-agent-cli`) installs with the [skills CLI](https://github.com/vercel-labs/skills).
+`-g` makes it available in all your projects; without it, the skill goes into the current project:
 
 ```bash
-npx skills add tns15june/langfuse-agent-cli
+npx skills add tns15june/langfuse-agent-cli -g
 ```
 
 ## Credentials
@@ -36,8 +37,8 @@ npx skills add tns15june/langfuse-agent-cli
 
 1. `--env-file <path>`
 2. `--profile <name>` or `LANGFUSE_PROFILE`
-3. `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, with the host from `LANGFUSE_BASE_URL`, then
-   `LANGFUSE_HOST` (default `https://cloud.langfuse.com`)
+3. `LANGFUSE_PUBLIC_KEY` or `LANGFUSE_SECRET_KEY` (either one selects this source), with the host from
+   `LANGFUSE_BASE_URL`, then `LANGFUSE_HOST` (default `https://cloud.langfuse.com`)
 4. The saved current profile
 
 `--host`, `--public-key` and `--secret-key` override single values; prefer environment variables or a
@@ -55,8 +56,9 @@ Profiles live in `~/.config/langfuse/profiles.json`, readable only by you (mode 
 
 ## Commands
 
-Output is JSON by default; `-o text` prints short lines instead. `--compact` drops null and empty
-fields, and `--agent-fields name,level` keeps only the listed fields of each row.
+Data commands print JSON by default and short lines with `-o text`; `doctor`, `auth` and `help-map`
+print text. `--compact` drops null and empty fields, and `--agent-fields name,level` keeps only the
+listed fields of each row.
 
 ```bash
 # Failing traces, one entry per trace, with each error message
@@ -65,7 +67,7 @@ lf trace list --status error --limit 10 --compact
 # One trace as a tree; add --io for short inputs and outputs
 lf trace get <trace-id> --timeline
 
-# All traces of a session, oldest first
+# The traces of a session, oldest first (the newest 1000)
 lf trace session <session-id> --compact
 
 # Recent traces, filtered
@@ -97,7 +99,8 @@ Trace 487b674e9a38e8d85cd683d2f022bf1d: 3 observations, 1 error
       Message: 503 Service Unavailable
 ```
 
-Exit codes: `0` success, `1` API or configuration error (the message is on stderr), `2` invalid command.
+Exit codes: `0` success, `1` API or configuration error, `2` invalid command. The reason for a failure is
+on stderr, except that `doctor` and `auth status` print their whole report, failures included, on stdout.
 
 ## API endpoints used
 
@@ -110,7 +113,8 @@ Exit codes: `0` success, `1` API or configuration error (the message is on stder
 | `prompt list`, `prompt get`, `prompt push` | `/api/public/v2/prompts` |
 | `dataset list`, `dataset get` | `/api/public/v2/datasets`, `/api/public/dataset-items` |
 | `score create` | `POST /api/public/scores` |
-| `doctor`, `auth status` | `/api/public/health`, `/api/public/projects` |
+| `doctor` | `/api/public/health`, `/api/public/projects`, `/api/public/v2/observations?limit=1` |
+| `auth login`, `auth status` | `/api/public/projects` |
 
 ## Development
 

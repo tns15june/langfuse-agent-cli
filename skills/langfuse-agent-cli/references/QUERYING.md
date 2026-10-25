@@ -9,7 +9,7 @@ Cloud after 2026-11-16).
 | `lf trace list` | Root observations (`isRootObservation=true`): one row per trace, newest first |
 | `lf trace list --status error` | Observations with `level=ERROR`, grouped by trace |
 | `lf trace get <trace-id>` | Every observation of the trace, across all pages |
-| `lf trace session <session-id>` | Root observations with that `sessionId`, oldest first |
+| `lf trace session <session-id>` | Root observations with that `sessionId` (the newest 1000), oldest first |
 
 ## Filters
 
@@ -21,7 +21,8 @@ lf trace list --status error --from-ts 2026-10-24T00:00:00Z --limit 20 --compact
 ```
 
 Timestamps are ISO 8601 and filter on the observation start time. `--limit` counts traces,
-also with `--status error`.
+also with `--status error`, which scans at most 5000 error observations. A trace's `errors` list
+can miss older errors; `lf trace get <trace-id>` shows all of them.
 
 ## Triage
 

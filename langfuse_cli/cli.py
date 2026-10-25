@@ -144,7 +144,8 @@ def create_parser() -> argparse.ArgumentParser:
     p_score_create.add_argument("--observation-id", help="Optional observation ID within the trace")
 
     # 7. Help map and progressive disclosure
-    subparsers.add_parser("help-map", parents=[common_parser], help="Machine-readable command catalog for AI agents")
+    subparsers.add_parser("help-map", parents=[common_parser],
+                          help="Compact command map for agents (* marks commands that write)")
     p_help = subparsers.add_parser("help", parents=[common_parser], help="Describe command details")
     p_help.add_argument("target_command", nargs="+", help="Command to describe (e.g. 'prompt get')")
 

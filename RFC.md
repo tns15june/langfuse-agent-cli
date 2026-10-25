@@ -8,8 +8,8 @@
 
 Langfuse already has an official CLI and official agent skills. This RFC proposes three small,
 separable features for `@langfuse/cli` that let coding agents control how much of a response reaches
-their context, plus two rules for `langfuse/skills`. Each feature is prototyped in
-`langfuse-agent-cli` or measured below.
+their context, plus two rules for `langfuse/skills`. Proposals 2 and 3 are prototyped in
+`langfuse-agent-cli`, and proposal 2 is measured below.
 
 ## What exists today
 
@@ -35,7 +35,7 @@ traffic has longer messages and more metadata, so the numbers will differ.
 | --- | --- |
 | One trace with 3 observations, all field groups | 12.9 KB |
 | The same trace, `fields=core,basic,time,model,usage` | 2.9 KB (−78%) |
-| The same trace, default `core,basic` | 1.65 KB (−88%) |
+| The same trace, default `core,basic` | 1.65 KB (−87%) |
 | `npx @langfuse/cli api observations list --level ERROR` (4 rows) | 3.0 KB |
 | The same output, keeping 7 triage fields | 1.05 KB (−66%) |
 | The same output, dropping null and empty-string fields | 2.4 KB (−21%) |
@@ -68,7 +68,7 @@ error output (table above).
 **Prototype.** `--agent-fields` and `--compact` in `langfuse_cli/formatters/agent.py`. Both work on
 any JSON response, so they need no per-endpoint code in a generated CLI.
 
-### 3. Saved profiles, `doctor` and `whoami`
+### 3. Saved profiles and `doctor`
 
 **Problem.** People and agents switch between local, staging and Cloud projects by juggling
 environment variables or `.env` files. When a call fails, no single command says whether the keys,

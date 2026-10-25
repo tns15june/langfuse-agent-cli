@@ -23,7 +23,7 @@ class ProfileConfig:
     host: str
     public_key: str
     secret_key: str
-    source: str = ""  # where host and keys came from: "profile", "env" or "env-file"
+    source: str = ""  # "profile", "env" or "env-file"; "flags" when both keys come from flags
 
     def is_complete(self) -> bool:
         return bool(self.host and self.public_key and self.secret_key)
@@ -130,9 +130,10 @@ class ConfigManager:
     ) -> ProfileConfig:
         """Take host and keys from one source, then apply explicit flag overrides.
 
-        Sources, first match wins: --env-file, --profile / LANGFUSE_PROFILE, LANGFUSE_* environment
-        variables, the saved current profile. Sources are never mixed, so a host found in one place
-        (a cloned repo's .env, say) cannot receive keys that came from another.
+        Sources, first match wins: --env-file, --profile / LANGFUSE_PROFILE, the environment (when
+        LANGFUSE_PUBLIC_KEY or LANGFUSE_SECRET_KEY is set), the saved current profile. Sources are
+        never mixed, so a host found in one place (a cloned repo's .env, say) cannot receive keys that
+        came from another.
         """
         explicit = name or os.environ.get("LANGFUSE_PROFILE")
         if env_file:

@@ -2,33 +2,39 @@
 
 ## Formats
 
-- JSON (default): exactly one JSON document on stdout, safe to pipe into `jq`.
+- JSON (default for data commands): exactly one JSON document on stdout, safe to pipe into `jq`.
+  `doctor`, `auth`, `help-map` and `trace get --timeline` print text.
 - Text (`-o text`): short lines for people. `lf trace get <trace-id> -o text` prints the timeline.
-- Errors go to stderr and the exit code is non-zero.
+- Errors go to stderr and the exit code is non-zero; `doctor` and `auth status` print their report,
+  failures included, on stdout.
 
 Terminal control characters found in server data (trace names, inputs, error messages) are
-printed escaped, for example `\x1b`.
+printed escaped, as `\u001b` and so on; inside JSON that is an ordinary escape, so values are unchanged.
 
 ## Smaller output
 
 `--compact` removes fields that are null, empty strings, empty lists or empty objects, at every
-level, for any command.
+level, in the JSON output of the data commands. Rows stay in place even when they end up empty.
 
-`--agent-fields` keeps only the listed fields of each row. Dotted paths reach into nested
-objects and through lists:
+`--agent-fields` keeps only the listed fields of each row and leaves out listed fields whose value
+is null. Dotted paths reach into nested objects and through lists:
 
 ```bash
 lf trace get <trace-id> --agent-fields name,type,level,statusMessage,latency
 lf trace list --agent-fields traceId,name,startTime --limit 20
 ```
 
-Sizes measured on Langfuse 4.70 with synthetic data, for one trace with three observations:
+API response sizes measured on Langfuse 4.70 with synthetic data, for one trace with three
+observations (`lf` indents its JSON, so what it prints is about a quarter larger):
 
-| What was requested | Size |
+| Field groups requested | Size |
 | --- | --- |
-| Every observation field group, including inputs and outputs | 12.9 KB |
-| What `trace get` requests (no inputs/outputs) | 2.9 KB |
-| What `trace list` requests per row (`core,basic`) | 1.65 KB for the 3 rows |
+| All ten, including inputs and outputs | 12.9 KB |
+| `core,basic,time,model,usage` | 2.9 KB |
+| `core,basic` | 1.65 KB |
+
+`trace get` requests `core,basic,time,model,usage,metrics` (no inputs/outputs, metadata or prompt
+fields); the list commands request `core,basic,metrics`. `metrics` adds a few bytes per row.
 
 ## Failing traces
 

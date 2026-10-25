@@ -6,7 +6,8 @@ import json
 import sys
 from typing import Any, Dict
 
-# One entry per leaf command of the parser; tests/test_help.py fails when the two drift apart.
+# One entry per leaf command of the parser; tests/test_help.py fails on a missing or extra command
+# and on a catalog option the parser does not have.
 COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
     "auth login": {
         "desc": "Save a connection profile and verify its keys",
@@ -80,7 +81,7 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
         ],
     },
     "trace session": {
-        "desc": "Traces of one session, oldest first",
+        "desc": "Traces of one session, oldest first (the newest 1000)",
         "write": False,
         "opts": ["<session_id>", "--compact", "--agent-fields <paths>"],
         "rules": [],

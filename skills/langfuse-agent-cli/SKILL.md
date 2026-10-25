@@ -3,7 +3,7 @@ name: langfuse-agent-cli
 description: >
   Inspect Langfuse from the terminal with the `lf` CLI: failing traces and their error
   messages, one trace as an observation tree, the traces of a session, prompts with their
-  variables filled in, datasets, and scores, as compact JSON. Use when debugging an LLM
+  variables filled in, datasets, and scores, as JSON. Use when debugging an LLM
   application's runs or prompts and `lf` is installed, or the user asks for it. For
   instrumenting code, Langfuse documentation, or API endpoints `lf` does not cover, use the
   official `langfuse` skill and `npx @langfuse/cli`.
@@ -11,8 +11,8 @@ description: >
 
 # langfuse-agent-cli
 
-`lf` reads Langfuse through its public API (Langfuse v4, self-hosted or Cloud). It prints JSON
-by default and short text with `-o text`.
+`lf` reads Langfuse through its public API (Langfuse v4, self-hosted or Cloud). Data commands print
+JSON by default and short text with `-o text`; `doctor`, `auth` and `help-map` print text.
 
 ## Fast path
 
@@ -23,7 +23,7 @@ by default and short text with `-o text`.
 | One trace as a tree | `lf trace get <trace-id> --timeline` |
 | The same, with short inputs and outputs | `lf trace get <trace-id> --timeline --io` |
 | A few fields of each observation | `lf trace get <trace-id> --agent-fields name,type,level,statusMessage` |
-| All traces of one conversation | `lf trace session <session-id> --compact` |
+| The traces of one conversation (the newest 1000) | `lf trace session <session-id> --compact` |
 | A prompt with its variables filled in | `lf prompt get <name> --label production --vars '{"user_name": "Alice"}' -o text` |
 | Record a score | `lf score create --trace-id <trace-id> --name accuracy --value 1` |
 
@@ -37,8 +37,9 @@ by default and short text with `-o text`.
    `lf prompt get <name>`, and tell the user what will change, unless they asked you to run it.
 4. Do not run `auth login`: it prompts for keys. Ask the user to run it, or to set
    `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL`. Never ask for keys in chat.
-5. A non-zero exit code means the command failed and the reason is on stderr. Run `lf doctor`
-   when it mentions credentials, HTTP 401, or a missing `/api/public/v2/observations`.
+5. A non-zero exit code means the command failed. The reason is on stderr, except for `lf doctor`
+   and `lf auth status`, which print their report on stdout. Run `lf doctor` when the reason
+   mentions credentials, HTTP 401, or a missing `/api/public/v2/observations`.
 
 ## Credentials
 
@@ -46,8 +47,8 @@ by default and short text with `-o text`.
 
 1. `--env-file <path>`
 2. `--profile <name>` or `LANGFUSE_PROFILE`
-3. `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, with the host from `LANGFUSE_BASE_URL`,
-   then `LANGFUSE_HOST`
+3. `LANGFUSE_PUBLIC_KEY` or `LANGFUSE_SECRET_KEY` (either one selects this source), with the
+   host from `LANGFUSE_BASE_URL`, then `LANGFUSE_HOST`
 4. The saved current profile (see `lf auth list`)
 
 `--host`, `--public-key` and `--secret-key` override single values. `lf` reads a `.env` file
