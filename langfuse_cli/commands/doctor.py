@@ -10,6 +10,8 @@ from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.config import ConfigManager, resolve_from_args
 
 SKILL_NAME = "langfuse-agent-cli"
+# The skill as of this CLI's release tag, so an installed skill never documents flags the CLI lacks
+SKILL_SOURCE = f"https://github.com/tns15june/langfuse-agent-cli/tree/v{__version__}/skills/{SKILL_NAME}"
 KNOWN_SKILL_TARGETS = [
     ("Claude Code", Path.home() / ".claude" / "skills"),
     ("Antigravity", Path.home() / ".gemini" / "config" / "skills"),
@@ -84,5 +86,5 @@ def handle_doctor(args: argparse.Namespace) -> int:
     if skills_found:
         print("  ✓ All checks passed.")
     else:
-        print("  ℹ Skill not installed. For all projects: npx skills add tns15june/langfuse-agent-cli -g")
+        print(f"  ℹ Skill not installed. Run 'lf setup', or: npx skills add {SKILL_SOURCE} -g")
     return 0

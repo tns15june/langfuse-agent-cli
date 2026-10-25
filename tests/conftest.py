@@ -6,6 +6,7 @@ import pytest
 import requests
 
 from langfuse_cli import config
+from langfuse_cli.commands import doctor
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +47,12 @@ class FakeAPI:
         resp.headers.update(headers)
         resp._content = (text if text is not None else jsonlib.dumps(body or {})).encode()
         return resp
+
+
+@pytest.fixture
+def no_skill_dirs(monkeypatch, tmp_path):
+    """Doctor looks for the skill only under tmp_path, never in the real home directory."""
+    monkeypatch.setattr(doctor, "KNOWN_SKILL_TARGETS", [("Claude Code", tmp_path / "skills")])
 
 
 @pytest.fixture

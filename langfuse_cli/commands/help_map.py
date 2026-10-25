@@ -42,6 +42,15 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
         "opts": ["--profile <name>", "--env-file <path>"],
         "rules": ["Exit code 1 means an authentication or server problem."],
     },
+    "setup": {
+        "desc": "Log in, install the agent skill and run doctor",
+        "write": True,
+        "opts": ["--yes", "--host <url>"],
+        "rules": [
+            "Prompts for keys unless --yes is given or stdin is not a terminal; agents run it with --yes.",
+            "Installs the skill version that matches the CLI; run it again after upgrading.",
+        ],
+    },
     "prompt list": {
         "desc": "List prompts with their versions, labels and tags",
         "write": False,

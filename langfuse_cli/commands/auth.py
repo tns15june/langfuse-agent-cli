@@ -4,9 +4,37 @@ from __future__ import annotations
 import argparse
 import getpass
 import sys
+from typing import Optional
 
 from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.config import ConfigManager, resolve_from_args
+
+
+def login(cfg: ConfigManager, profile_name: str, host: str, public_key: Optional[str], secret_key: Optional[str],
+          set_default: bool) -> int:
+    """Prompt for missing keys, save the profile, then verify the keys against the server."""
+    if not public_key:
+        public_key = input("Enter Langfuse Public Key (pk-lf-...): ").strip()
+    if not secret_key:
+        secret_key = getpass.getpass("Enter Langfuse Secret Key (sk-lf-...): ").strip()
+
+    cfg.save_profile(
+        name=profile_name,
+        host=host,
+        public_key=public_key,
+        secret_key=secret_key,
+        set_default=set_default,
+    )
+    print(f"✓ Profile '{profile_name}' saved successfully ({host}).")
+
+    client = LangfuseClient(cfg.resolve_profile(name=profile_name))
+    try:
+        projects = client.get_project().get("data") or []
+    except LangfuseAPIError as e:
+        print(f"⚠ Profile saved, but the keys could not be verified: {e}", file=sys.stderr)
+        return 1
+    print(f"✓ Keys verified for project: {', '.join(p.get('name', '?') for p in projects) or '(none)'}")
+    return 0
 
 
 def handle_auth(args: argparse.Namespace) -> int:
@@ -14,33 +42,8 @@ def handle_auth(args: argparse.Namespace) -> int:
     subaction = getattr(args, "auth_action", None)
 
     if subaction == "login":
-        profile_name = args.profile_name or "default"
-        host = args.host or "https://cloud.langfuse.com"
-        public_key = args.public_key
-        secret_key = args.secret_key
-
-        if not public_key:
-            public_key = input("Enter Langfuse Public Key (pk-lf-...): ").strip()
-        if not secret_key:
-            secret_key = getpass.getpass("Enter Langfuse Secret Key (sk-lf-...): ").strip()
-
-        cfg.save_profile(
-            name=profile_name,
-            host=host,
-            public_key=public_key,
-            secret_key=secret_key,
-            set_default=args.default,
-        )
-        print(f"✓ Profile '{profile_name}' saved successfully ({host}).")
-
-        client = LangfuseClient(cfg.resolve_profile(name=profile_name))
-        try:
-            projects = client.get_project().get("data") or []
-        except LangfuseAPIError as e:
-            print(f"⚠ Profile saved, but the keys could not be verified: {e}", file=sys.stderr)
-            return 1
-        print(f"✓ Keys verified for project: {', '.join(p.get('name', '?') for p in projects) or '(none)'}")
-        return 0
+        return login(cfg, args.profile_name or "default", args.host or "https://cloud.langfuse.com",
+                     args.public_key, args.secret_key, args.default)
 
     elif subaction == "switch":
         target = args.target_profile

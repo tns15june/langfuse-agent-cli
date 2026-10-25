@@ -1,10 +1,9 @@
 import json
 
 import pytest
-from helpers import load_fixture
+from helpers import load_fixture, route_doctor
 
 from langfuse_cli.cli import main
-from langfuse_cli.commands import doctor
 from langfuse_cli.config import ConfigManager
 
 FLAGS = ["--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]
@@ -72,21 +71,6 @@ def test_dataset_run_is_gone():
     with pytest.raises(SystemExit) as exc:
         main(["dataset", "run", "--dataset", "d", "--run-name", "r"])
     assert exc.value.code == 2
-
-
-@pytest.fixture
-def no_skill_dirs(monkeypatch, tmp_path):
-    monkeypatch.setattr(doctor, "KNOWN_SKILL_TARGETS", [("Claude Code", tmp_path / "skills")])
-
-
-def route_doctor(fake_api, projects_status=200, observations_status=200):
-    fake_api.route("GET", "/api/public/health", json=load_fixture("health"))
-    projects = load_fixture("projects") if projects_status == 200 else {"message": "Invalid credentials"}
-    fake_api.route("GET", "/api/public/projects", json=projects, status=projects_status)
-    observations = load_fixture("obs_empty") if observations_status == 200 else None
-    fake_api.route("GET", OBS, json=observations, status=observations_status,
-                   text=None if observations_status == 200 else "<html>404</html>",
-                   content_type="application/json" if observations_status == 200 else "text/html")
 
 
 def test_doctor_valid_keys(fake_api, capsys, no_skill_dirs):

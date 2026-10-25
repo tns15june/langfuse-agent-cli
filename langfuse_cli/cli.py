@@ -13,6 +13,7 @@ from langfuse_cli.commands.doctor import handle_doctor
 from langfuse_cli.commands.help_map import handle_help_describe, handle_help_map
 from langfuse_cli.commands.prompt import handle_prompt
 from langfuse_cli.commands.score import handle_score
+from langfuse_cli.commands.setup import handle_setup
 from langfuse_cli.commands.trace import handle_trace
 from langfuse_cli.config import ConfigError
 from langfuse_cli.formatters import clean
@@ -82,8 +83,13 @@ def create_parser() -> argparse.ArgumentParser:
     auth_sub.add_parser("list", parents=[common_parser], help="List configured profiles")
     auth_sub.add_parser("status", parents=[common_parser], help="Check current profile status and connectivity")
 
-    # 2. Doctor command
+    # 2. Doctor and setup
     subparsers.add_parser("doctor", parents=[common_parser], help="Check credentials, server and the agent skill")
+    p_setup = subparsers.add_parser("setup", parents=[common_parser],
+                                    help="Log in, install the agent skill and run doctor")
+    p_setup.add_argument("-y", "--yes", action="store_true",
+                         help="Never prompt: skip login when no working credentials are found and install the skill "
+                              "without asking")
 
     # 3. Prompt command
     p_prompt = subparsers.add_parser("prompt", parents=[common_parser], help="Inspect and manage prompt versions")
@@ -168,6 +174,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     handlers = {
         "auth": handle_auth,
         "doctor": handle_doctor,
+        "setup": handle_setup,
         "prompt": handle_prompt,
         "trace": handle_trace,
         "dataset": handle_dataset,
