@@ -1,0 +1,11 @@
+{
+  "id": "cmvmxhhwo0008qm4anmzc91if",
+  "projectId": "langfuse-agent-cli",
+  "name": "intent-classification-evals",
+  "description": "Synthetic intent examples",
+  "metadata": null,
+  "inputSchema": null,
+  "expectedOutputSchema": null,
+  "createdAt": "2026-10-24T21:46:02.088Z",
+  "updatedAt": "2026-10-24T21:46:02.088Z"
+}

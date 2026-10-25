@@ -1,0 +1,67 @@
+{
+  "data": [
+    {
+      "id": "38532cc6-368f-4614-b439-7aada784fc9d",
+      "datasetId": "cmvmxhhwo0008qm4anmzc91if",
+      "sourceTraceId": null,
+      "sourceObservationId": null,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-24T21:46:02.161Z",
+      "updatedAt": "2026-10-24T21:46:02.161Z",
+      "input": {
+        "text": "app crashes on start"
+      },
+      "expectedOutput": {
+        "intent": "bug"
+      },
+      "metadata": null,
+      "datasetName": "intent-classification-evals",
+      "version": "2026-10-24T21:46:02.161Z",
+      "mediaReferences": []
+    },
+    {
+      "id": "2d641ebe-ac8c-4274-87b3-f0bf165a098d",
+      "datasetId": "cmvmxhhwo0008qm4anmzc91if",
+      "sourceTraceId": null,
+      "sourceObservationId": null,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-24T21:46:02.147Z",
+      "updatedAt": "2026-10-24T21:46:02.147Z",
+      "input": {
+        "text": "upgrade to pro"
+      },
+      "expectedOutput": {
+        "intent": "billing"
+      },
+      "metadata": null,
+      "datasetName": "intent-classification-evals",
+      "version": "2026-10-24T21:46:02.146Z",
+      "mediaReferences": []
+    },
+    {
+      "id": "4708be3f-b822-45c7-885e-a5e304da978f",
+      "datasetId": "cmvmxhhwo0008qm4anmzc91if",
+      "sourceTraceId": null,
+      "sourceObservationId": null,
+      "status": "ACTIVE",
+      "createdAt": "2026-10-24T21:46:02.134Z",
+      "updatedAt": "2026-10-24T21:46:02.134Z",
+      "input": {
+        "text": "reset my password"
+      },
+      "expectedOutput": {
+        "intent": "account"
+      },
+      "metadata": null,
+      "datasetName": "intent-classification-evals",
+      "version": "2026-10-24T21:46:02.134Z",
+      "mediaReferences": []
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 50,
+    "totalItems": 3,
+    "totalPages": 1
+  }
+}

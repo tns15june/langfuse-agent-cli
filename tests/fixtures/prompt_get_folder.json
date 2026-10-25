@@ -1,0 +1,32 @@
+{
+  "id": "856f5b93-e4d3-44a1-8480-579c0f688161",
+  "createdAt": "2026-10-24T21:46:02.054Z",
+  "updatedAt": "2026-10-24T21:46:02.054Z",
+  "projectId": "langfuse-agent-cli",
+  "createdBy": "API",
+  "prompt": [
+    {
+      "role": "system",
+      "content": "You help {{user_name}} with their account."
+    },
+    {
+      "role": "user",
+      "content": "{{question}}"
+    }
+  ],
+  "name": "support/greeter",
+  "version": 1,
+  "type": "chat",
+  "isActive": true,
+  "config": {},
+  "tags": [
+    "support"
+  ],
+  "labels": [
+    "production",
+    "staging",
+    "latest"
+  ],
+  "commitMessage": null,
+  "resolutionGraph": null
+}

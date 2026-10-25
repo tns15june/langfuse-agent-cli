@@ -1,11 +1,13 @@
 """REST API client for Langfuse."""
 from __future__ import annotations
 
-import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, Iterator, List
+from urllib.parse import quote
+
 import requests
 from requests.auth import HTTPBasicAuth
 
+from langfuse_cli import __version__
 from langfuse_cli.config import ProfileConfig
 
 
@@ -25,7 +27,7 @@ class LangfuseClient:
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": "langfuse-agent-cli/0.1.0",
+            "User-Agent": f"langfuse-agent-cli/{__version__}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         })
@@ -107,7 +109,8 @@ class LangfuseClient:
             params["version"] = version
         if label:
             params["label"] = label
-        return self._request("GET", f"/api/public/v2/prompts/{name}", params=params)
+        # Prompt names may contain "/" (folders); the API expects them encoded as one path segment.
+        return self._request("GET", f"/api/public/v2/prompts/{quote(name, safe='')}", params=params)
 
     def create_prompt(
         self,
@@ -131,62 +134,40 @@ class LangfuseClient:
             body["tags"] = tags
         return self._request("POST", "/api/public/v2/prompts", data=body)
 
-    # 3. Traces API
-    def list_traces(
-        self,
-        page: int = 1,
-        limit: int = 20,
-        session_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        from_ts: Optional[str] = None,
-        to_ts: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        params: Dict[str, Any] = {"page": page, "limit": limit}
-        if session_id:
-            params["sessionId"] = session_id
-        if user_id:
-            params["userId"] = user_id
-        if from_ts:
-            params["fromTimestamp"] = from_ts
-        if to_ts:
-            params["toTimestamp"] = to_ts
-        if tags:
-            params["tags"] = tags
-        return self._request("GET", "/api/public/traces", params=params)
+    # 3. Observations API v2: the v4 read path for traces, sessions and errors
+    def list_observations(self, **params: Any) -> Dict[str, Any]:
+        query = {k: str(v).lower() if isinstance(v, bool) else v for k, v in params.items() if v is not None}
+        return self._request("GET", "/api/public/v2/observations", params=query)
 
-    def get_trace(self, trace_id: str) -> Dict[str, Any]:
-        return self._request("GET", f"/api/public/traces/{trace_id}")
+    def iter_observations(self, params: Dict[str, Any], max_items: Optional[int] = None) -> Iterator[Dict[str, Any]]:
+        """Yield observations across cursor pages, stopping after max_items when given."""
+        remaining = max_items
+        cursor = None
+        while remaining is None or remaining > 0:
+            page = self.list_observations(
+                **params, limit=1000 if remaining is None else min(1000, remaining), cursor=cursor
+            )
+            data = page.get("data", [])
+            if remaining is not None:
+                data = data[:remaining]
+                remaining -= len(data)
+            yield from data
+            cursor = (page.get("meta") or {}).get("cursor")
+            if not cursor:
+                return
 
-    # 4. Sessions API
-    def get_session(self, session_id: str) -> Dict[str, Any]:
-        return self._request("GET", f"/api/public/sessions/{session_id}")
-
-    # 5. Datasets API
+    # 4. Datasets API
     def list_datasets(self, page: int = 1, limit: int = 50) -> Dict[str, Any]:
-        return self._request("GET", "/api/public/datasets", params={"page": page, "limit": limit})
+        return self._request("GET", "/api/public/v2/datasets", params={"page": page, "limit": limit})
 
     def get_dataset(self, name: str) -> Dict[str, Any]:
-        return self._request("GET", f"/api/public/datasets/{name}")
+        return self._request("GET", f"/api/public/v2/datasets/{quote(name, safe='')}")
 
-    def create_dataset_run(
-        self,
-        dataset_name: str,
-        run_name: str,
-        description: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        body: Dict[str, Any] = {
-            "datasetName": dataset_name,
-            "name": run_name,
-        }
-        if description:
-            body["description"] = description
-        if metadata:
-            body["metadata"] = metadata
-        return self._request("POST", "/api/public/dataset-runs", data=body)
+    def list_dataset_items(self, dataset_name: str, page: int = 1, limit: int = 50) -> Dict[str, Any]:
+        params = {"datasetName": dataset_name, "page": page, "limit": limit}
+        return self._request("GET", "/api/public/dataset-items", params=params)
 
-    # 6. Scores API
+    # 5. Scores API
     def create_score(
         self,
         trace_id: str,
