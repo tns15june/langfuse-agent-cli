@@ -92,8 +92,9 @@ PAD = "x" * (17 * 1024)
     (["dataset", "list"], "GET", "/api/public/v2/datasets", {"data": [{"name": PAD}]}),
     (["score", "create", "--trace-id", "t1", "--name", "n", "--value", "1"], "POST", "/api/public/scores",
      {"id": "s1", "comment": PAD}),
+    (["metrics", "--by", "name"], "GET", "/api/public/v2/metrics", {"data": [{"name": PAD, "count_count": 1}]}),
 ], ids=["trace-list", "error-list", "session", "prompt-list", "prompt-get", "prompt-push", "dataset-list",
-        "score-create"])
+        "score-create", "metrics"])
 def test_every_json_command_honours_output_summary(fake_api, capsys, argv, method, path, body):
     fake_api.route(method, path, json=body)
 

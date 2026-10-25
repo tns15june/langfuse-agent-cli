@@ -1,6 +1,7 @@
 """Checks against a real Langfuse seeded by scripts/seed_langfuse.py. Skipped unless LF_LIVE=1."""
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,17 @@ def test_output_summary_writes_the_trace_to_a_file(capsys, monkeypatch):
     assert envelope["summary"] is True
     assert len(rows) == envelope["rows"]
     assert {"input", "output"} <= set(envelope["rowKeys"])
+
+
+def test_metrics_counts_observations_by_type(capsys):
+    start = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(timespec="seconds").replace("+00:00", "Z")
+    rows = run_json(capsys, "metrics", "--metric", "count", "--by", "type", "--from-ts", start)
+    assert rows and all("count_count" in row for row in rows)
+
+
+def test_metrics_reports_a_bad_view_with_the_server_detail(capsys):
+    code, _, err = run(capsys, "metrics", "--view", "observations", "--metric", "notAMeasure")
+    assert code == 1 and err.startswith("Error: HTTP 400")
 
 
 def test_trace_session_lists_its_traces(capsys):

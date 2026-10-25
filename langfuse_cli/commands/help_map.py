@@ -109,6 +109,19 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
         "opts": ["<name>", "--compact", "--output-summary"],
         "rules": [],
     },
+    "metrics": {
+        "desc": "Aggregates over a time range: spend, tokens, latency percentiles, error counts, scores",
+        "write": False,
+        "opts": ["--metric <measure[:agg],...>", "--by <dims>", "--where <col=value>", "--granularity <unit>",
+                 "--from-ts <iso>", "--to-ts <iso>", "--order-by <field[:asc]>", "--limit <n>",
+                 "--view <observations|scores-numeric|...>", "--output <json|text>"],
+        "rules": [
+            "Default window: the last 24 hours. Turn 'today' or 'this week' into ISO timestamps in UTC.",
+            "Result keys are <aggregation>_<measure>, e.g. sum_totalCost, p95_latency, count_count.",
+            "Observation latency here is in milliseconds; trace rows give seconds.",
+            "userId, sessionId and traceId work only in --where, not in --by.",
+        ],
+    },
     "score create": {
         "desc": "Record a numeric score on a trace or one of its observations",
         "write": True,

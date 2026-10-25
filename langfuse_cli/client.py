@@ -1,6 +1,7 @@
 """REST API client for Langfuse."""
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import quote
 
@@ -64,9 +65,14 @@ class LangfuseClient:
                                    status_code=resp.status_code)
         if not resp.ok:
             try:
-                message = resp.json().get("message")
+                body = resp.json()
+                message = body.get("message")
+                details = body.get("error")
             except (ValueError, AttributeError):
-                message = None
+                message, details = None, None
+            if message and isinstance(details, list) and details and isinstance(details[0], dict):
+                detail = details[0].get("message")  # validation errors say which value was wrong
+                message = f"{message}: {detail}" if detail else message
             if message:
                 error_msg = f"HTTP {resp.status_code}: {message}"
             elif "html" in resp.headers.get("Content-Type", ""):
@@ -170,6 +176,9 @@ class LangfuseClient:
 
     def get_dataset(self, name: str) -> Dict[str, Any]:
         return self._request("GET", f"/api/public/v2/datasets/{quote(name, safe='')}")
+
+    def metrics(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        return self._request("GET", "/api/public/v2/metrics", params={"query": json.dumps(query)})
 
     def list_dataset_items(self, dataset_name: str, page: int = 1, limit: int = 50) -> Dict[str, Any]:
         params = {"datasetName": dataset_name, "page": page, "limit": limit}

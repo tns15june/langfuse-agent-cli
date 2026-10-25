@@ -11,6 +11,7 @@ from langfuse_cli.commands.auth import handle_auth
 from langfuse_cli.commands.dataset import handle_dataset
 from langfuse_cli.commands.doctor import handle_doctor
 from langfuse_cli.commands.help_map import handle_help_describe, handle_help_map
+from langfuse_cli.commands.metrics import AGGREGATIONS, handle_metrics, row_limit
 from langfuse_cli.commands.prompt import handle_prompt
 from langfuse_cli.commands.score import handle_score
 from langfuse_cli.commands.setup import handle_setup
@@ -142,7 +143,25 @@ def create_parser() -> argparse.ArgumentParser:
     p_dataset_get.add_argument("name", help="Dataset name")
 
 
-    # 6. Score command
+    # 6. Metrics
+    p_metrics = subparsers.add_parser("metrics", parents=[common_parser],
+                                      help="Cost, tokens, latency, error counts and scores, aggregated")
+    p_metrics.add_argument("--view", choices=["observations", "scores-numeric", "scores-boolean", "scores-categorical"],
+                           default="observations", help="What to aggregate (default: observations)")
+    p_metrics.add_argument("--metric", default="count",
+                           help="measure[:aggregation], comma-separated, e.g. totalCost:sum,latency:p95 "
+                                f"(aggregations: {', '.join(AGGREGATIONS)}; default: count)")
+    p_metrics.add_argument("--by", help="Comma-separated dimensions to group by, e.g. providedModelName,name")
+    p_metrics.add_argument("--where", action="append", help="Filter column=value; repeat for more, e.g. level=ERROR")
+    p_metrics.add_argument("--granularity", choices=["auto", "minute", "hour", "day", "week", "month"],
+                           help="Group by time in buckets of this size")
+    p_metrics.add_argument("--from-ts", help="Start, ISO-8601 (default: 24 hours ago)")
+    p_metrics.add_argument("--to-ts", help="End, ISO-8601 (default: now)")
+    p_metrics.add_argument("--order-by", help="Result field to sort by, e.g. sum_totalCost or p95_latency:asc "
+                                              "(default direction: desc)")
+    p_metrics.add_argument("--limit", type=row_limit, default=100, help="Maximum rows, 1-1000 (default: 100)")
+
+    # 7. Score command
     p_score = subparsers.add_parser("score", parents=[common_parser], help="Record evaluation scores")
     score_sub = p_score.add_subparsers(dest="score_action", required=True)
     p_score_create = score_sub.add_parser("create", parents=[common_parser], help="Create a score on a trace")
@@ -152,7 +171,7 @@ def create_parser() -> argparse.ArgumentParser:
     p_score_create.add_argument("--comment", help="Optional comment explaining score")
     p_score_create.add_argument("--observation-id", help="Optional observation ID within the trace")
 
-    # 7. Help map and progressive disclosure
+    # 8. Help map and progressive disclosure
     subparsers.add_parser("help-map", parents=[common_parser],
                           help="Compact command map for agents (* marks commands that write)")
     p_help = subparsers.add_parser("help", parents=[common_parser], help="Describe command details")
@@ -179,6 +198,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "trace": handle_trace,
         "dataset": handle_dataset,
         "score": handle_score,
+        "metrics": handle_metrics,
         "help-map": handle_help_map,
         "help": handle_help_describe,
     }
