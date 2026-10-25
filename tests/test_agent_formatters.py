@@ -1,22 +1,39 @@
-from langfuse_cli.formatters.agent import compact_trace, format_agent_output
+import json
+
+from helpers import load_fixture
+
+from langfuse_cli.formatters.agent import format_agent_output, prune
 
 
-def test_compact_trace_formatter():
-    raw_trace = {
-        "id": "tr_123",
-        "name": "agent_execution",
-        "timestamp": "2026-10-24T20:00:00Z",
-        "latency": 3.14159,
-        "totalCost": 0.005432,
-        "sessionId": "sess_001",
-        "observations": [
-            {"type": "SPAN", "name": "router", "latency": 0.5, "level": "DEFAULT", "model": "claude-3-5"},
-            {"type": "GENERATION", "name": "tool", "level": "ERROR", "statusMessage": "Failed with code 500"},
-        ],
-    }
-    compacted = compact_trace(raw_trace)
-    assert compacted["id"] == "tr_123"
-    assert compacted["latency_sec"] == 3.142
-    assert compacted["cost_usd"] == 0.00543
-    assert compacted["models"] == ["claude-3-5"]
-    assert "tool: Failed with code 500" in compacted["errors"]
+def test_prune_drops_empty_values():
+    data = {"a": None, "b": "", "c": [], "d": {"e": None}, "f": 0, "g": False}
+
+    assert prune(data) == {"f": 0, "g": False}
+
+
+def test_compact_prunes_each_row():
+    rows = load_fixture("obs_trace")["data"]
+
+    out = json.loads(format_agent_output(rows, compact=True))
+
+    assert "statusMessage" not in out[0]  # "" on a DEFAULT-level row
+    assert out[1]["statusMessage"] == "503 Service Unavailable"
+    assert "completionStartTime" not in out[0]  # null in the recorded response
+
+
+def test_agent_fields_apply_per_list_item():
+    rows = load_fixture("obs_trace")["data"]
+
+    out = json.loads(format_agent_output(rows, agent_fields="name,level"))
+
+    assert out == [
+        {"name": "plan-step", "level": "DEFAULT"},
+        {"name": "search_tool_call", "level": "ERROR"},
+        {"name": "support-agent-turn", "level": "DEFAULT"},
+    ]
+
+
+def test_agent_fields_traverse_lists():
+    data = {"obs": [{"name": "x"}, {"name": "y"}]}
+
+    assert json.loads(format_agent_output(data, agent_fields="obs.name")) == {"obs.name": ["x", "y"]}

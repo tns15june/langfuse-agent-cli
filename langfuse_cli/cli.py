@@ -16,6 +16,7 @@ from langfuse_cli.commands.dataset import handle_dataset
 from langfuse_cli.commands.score import handle_score
 from langfuse_cli.commands.skills import handle_skills
 from langfuse_cli.commands.help_map import handle_help_map, handle_help_describe
+from langfuse_cli.formatters import clean
 
 # Common options use argparse.SUPPRESS so a subcommand's default never overwrites a value given
 # before the subcommand; these defaults are applied once after parsing instead.
@@ -29,6 +30,19 @@ COMMON_DEFAULTS = {
     "compact": False,
     "agent_fields": None,
 }
+
+
+class _SafeStream:
+    """Wraps stdout/stderr so nothing a command prints, server data included, can drive the terminal."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, text: str) -> int:
+        return self._stream.write(clean(text))
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -168,11 +182,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         "help-map": handle_help_map,
         "help": handle_help_describe,
     }
+    streams = sys.stdout, sys.stderr
+    sys.stdout, sys.stderr = _SafeStream(sys.stdout), _SafeStream(sys.stderr)
     try:
         return handlers[args.command](args)
     except (LangfuseAPIError, ConfigError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
+    finally:
+        sys.stdout, sys.stderr = streams
 
 
 if __name__ == "__main__":

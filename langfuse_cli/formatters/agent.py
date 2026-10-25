@@ -6,15 +6,14 @@ from typing import Any, Dict, List, Optional
 
 
 def extract_field_path(data: Any, path: str) -> Any:
-    """Extract nested value like 'user.name' or 'status.category'."""
-    parts = path.split(".")
-    curr = data
-    for p in parts:
-        if isinstance(curr, dict):
-            curr = curr.get(p)
-        else:
-            return None
-    return curr
+    """Value at a dotted path like 'usageDetails.input'; a list on the way maps the rest over its items."""
+    if isinstance(data, list):
+        return [extract_field_path(item, path) for item in data]
+    if not isinstance(data, dict):
+        return None
+    head, _, rest = path.partition(".")
+    value = data.get(head)
+    return extract_field_path(value, rest) if rest else value
 
 
 def filter_dict_fields(item: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
@@ -24,6 +23,17 @@ def filter_dict_fields(item: Dict[str, Any], fields: List[str]) -> Dict[str, Any
         if val is not None:
             out[f] = val
     return out
+
+
+def prune(data: Any) -> Any:
+    """Drop None, "", [] and {} values at every level; this is what --compact does."""
+    empty = (None, "", [], {})
+    if isinstance(data, dict):
+        pruned = {k: prune(v) for k, v in data.items()}
+        return {k: v for k, v in pruned.items() if v not in empty}
+    if isinstance(data, list):
+        return [v for v in map(prune, data) if v not in empty]
+    return data
 
 
 def compact_trace(trace: Dict[str, Any]) -> Dict[str, Any]:
@@ -70,45 +80,18 @@ def compact_trace(trace: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in res.items() if v is not None}
 
 
-def compact_prompt(prompt: Dict[str, Any]) -> Dict[str, Any]:
-    """Produces a concise summary of a prompt."""
-    return {
-        "name": prompt.get("name"),
-        "version": prompt.get("version"),
-        "type": prompt.get("type", "text"),
-        "labels": prompt.get("labels") or [],
-        "tags": prompt.get("tags") or [],
-        "updatedAt": prompt.get("updatedAt"),
-        "prompt": prompt.get("prompt"),
-        "config": prompt.get("config") or {},
-    }
-
-
 def format_agent_output(
     data: Any,
-    output_format: str = "json",
     compact: bool = False,
     agent_fields: Optional[str] = None,
 ) -> str:
-    """Formats data for agent ingestion."""
-    if output_format == "json":
-        if agent_fields and isinstance(data, list):
-            fields_list = [f.strip() for f in agent_fields.split(",")]
-            data = [filter_dict_fields(d, fields_list) for d in data if isinstance(d, dict)]
-        elif compact:
-            if isinstance(data, list):
-                # Check what type of list
-                if data and "timestamp" in data[0] and "id" in data[0]:
-                    data = [compact_trace(d) for d in data]
-                elif data and "prompt" in data[0]:
-                    data = [compact_prompt(d) for d in data]
-            elif isinstance(data, dict):
-                if "timestamp" in data and "id" in data:
-                    data = compact_trace(data)
-                elif "prompt" in data and "name" in data:
-                    data = compact_prompt(data)
-
-        return json.dumps(data, indent=2, ensure_ascii=False)
-
-    # Text fallback
-    return str(data)
+    """JSON for agents: optional field projection (applied to each list item), then optional pruning."""
+    if agent_fields:
+        fields = [f.strip() for f in agent_fields.split(",") if f.strip()]
+        if isinstance(data, list):
+            data = [filter_dict_fields(d, fields) for d in data if isinstance(d, dict)]
+        elif isinstance(data, dict):
+            data = filter_dict_fields(data, fields)
+    if compact:
+        data = prune(data)
+    return json.dumps(data, indent=2, ensure_ascii=False)

@@ -1,7 +1,9 @@
 """Terminal visualizer and timeline renderer for Langfuse traces."""
 from __future__ import annotations
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
+MARKS = {"ERROR": "✗ [ERROR]", "WARNING": "⚠ [WARN]"}
 
 
 def format_duration(seconds: float) -> str:
@@ -10,54 +12,39 @@ def format_duration(seconds: float) -> str:
     return f"{seconds:.2f}s"
 
 
-def render_trace_timeline(trace: Dict[str, Any]) -> str:
-    lines = []
-    trace_id = trace.get("id", "unknown")
-    name = trace.get("name", "unnamed")
-    latency = trace.get("latency") or trace.get("duration")
-    dur_str = f" ({format_duration(float(latency))})" if latency else ""
-    cost = trace.get("totalCost")
-    cost_str = f" [${float(cost):.4f}]" if cost else ""
+def render_trace_timeline(trace_id: str, observations: List[Dict[str, Any]]) -> str:
+    """One trace as an observation tree: children under their parent, siblings by start time."""
+    ids = {o.get("id") for o in observations}
+    children: Dict[Any, List[Dict[str, Any]]] = {}
+    roots = []
+    for obs in sorted(observations, key=lambda o: o.get("startTime") or ""):
+        parent = obs.get("parentObservationId")
+        if parent in ids:
+            children.setdefault(parent, []).append(obs)
+        else:
+            roots.append(obs)  # no parent, or the parent is not part of this response
 
-    lines.append(f"Trace: {name} ({trace_id}){dur_str}{cost_str}")
-    lines.append(f"Timestamp: {trace.get('timestamp', 'N/A')} | Session: {trace.get('sessionId', 'N/A')} | User: {trace.get('userId', 'N/A')}")
-    if trace.get("tags"):
-        lines.append(f"Tags: {', '.join(trace['tags'])}")
+    errors = sum(1 for o in observations if o.get("level") == "ERROR")
+    lines = [f"Trace {trace_id}: {len(observations)} observations, {errors} error{'' if errors == 1 else 's'}"]
 
-    observations: List[Dict[str, Any]] = trace.get("observations") or []
-    if not observations:
-        lines.append("  (No observations recorded in this trace)")
-        return "\n".join(lines)
+    def walk(obs: Dict[str, Any], depth: int) -> None:
+        indent = "  " * depth
+        level = obs.get("level") or "DEFAULT"
+        line = f"{indent}{MARKS.get(level, '✓')} {obs.get('type') or 'SPAN'} {obs.get('name') or 'unnamed'}"
+        if obs.get("latency") is not None:
+            line += f" [{format_duration(float(obs['latency']))}]"
+        if obs.get("model"):
+            line += f" (model: {obs['model']})"
+        lines.append(line)
+        if level in MARKS and obs.get("statusMessage"):
+            lines.append(f"{indent}    Message: {obs['statusMessage']}")
+        for key in ("input", "output"):
+            value = obs.get(key)
+            if isinstance(value, str) and value.strip() and len(value) < 120:
+                lines.append(f"{indent}    {key.capitalize()}: {value.strip()}")
+        for child in children.get(obs.get("id"), []):
+            walk(child, depth + 1)
 
-    lines.append("\nObservations Timeline:")
-    # Sort observations by startTime if available
-    sorted_obs = sorted(observations, key=lambda x: x.get("startTime") or "")
-
-    for i, obs in enumerate(sorted_obs, 1):
-        obs_type = obs.get("type", "SPAN")
-        obs_name = obs.get("name", "unnamed")
-        obs_dur = obs.get("latency") or obs.get("duration")
-        obs_dur_str = f" [{format_duration(float(obs_dur))}]" if obs_dur else ""
-        level = obs.get("level", "DEFAULT")
-
-        status_prefix = "  ✓"
-        if level == "ERROR":
-            status_prefix = "  ✗ [ERROR]"
-        elif level == "WARNING":
-            status_prefix = "  ⚠ [WARN]"
-
-        model_info = f" (model: {obs.get('model')})" if obs.get("model") else ""
-        lines.append(f"{status_prefix} {i}. {obs_type.upper()}: {obs_name}{obs_dur_str}{model_info}")
-
-        if level == "ERROR" and obs.get("statusMessage"):
-            lines.append(f"      Message: {obs['statusMessage']}")
-
-        # Show input/output excerpts if small
-        inp = obs.get("input")
-        out = obs.get("output")
-        if inp and isinstance(inp, str) and len(inp) < 120:
-            lines.append(f"      Input: {inp.strip()}")
-        if out and isinstance(out, str) and len(out) < 120:
-            lines.append(f"      Output: {out.strip()}")
-
+    for root in roots:
+        walk(root, 0)
     return "\n".join(lines)

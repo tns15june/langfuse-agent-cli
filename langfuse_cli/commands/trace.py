@@ -48,7 +48,7 @@ def handle_trace(args: argparse.Namespace) -> int:
                 traces = filtered
 
             if out_format == "json":
-                print(format_agent_output(traces, output_format="json", compact=compact, agent_fields=agent_fields))
+                print(format_agent_output(traces, compact=compact, agent_fields=agent_fields))
             else:
                 if not traces:
                     print("No traces found matching criteria.")
@@ -70,7 +70,7 @@ def handle_trace(args: argparse.Namespace) -> int:
             if getattr(args, "timeline", False) or out_format == "text":
                 print(render_trace_timeline(trace))
             else:
-                print(format_agent_output(trace, output_format="json", compact=compact, agent_fields=agent_fields))
+                print(format_agent_output(trace, compact=compact, agent_fields=agent_fields))
             return 0
 
         elif action == "session":

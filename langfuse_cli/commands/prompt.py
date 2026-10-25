@@ -53,7 +53,7 @@ def handle_prompt(args: argparse.Namespace) -> int:
             res = client.list_prompts(limit=limit, tag=tag)
             prompts = res.get("data", [])
             if out_format == "json":
-                print(format_agent_output(prompts, output_format="json", compact=compact, agent_fields=agent_fields))
+                print(format_agent_output(prompts, compact=compact, agent_fields=agent_fields))
             else:
                 if not prompts:
                     print("No prompts found.")
@@ -84,7 +84,7 @@ def handle_prompt(args: argparse.Namespace) -> int:
                     print(f"Warning: Failed to parse --vars JSON: {e}", file=sys.stderr)
 
             if out_format == "json":
-                print(format_agent_output(prompt, output_format="json", compact=compact, agent_fields=agent_fields))
+                print(format_agent_output(prompt, compact=compact, agent_fields=agent_fields))
             else:
                 print(f"Prompt: {prompt.get('name')} (v{prompt.get('version')})")
                 print(f"Type: {prompt.get('type', 'text')}")

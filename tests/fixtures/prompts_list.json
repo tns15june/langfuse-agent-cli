@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "name": "support/greeter",
+      "tags": [
+        "support"
+      ],
+      "lastUpdatedAt": "2026-10-24T21:46:02.054Z",
+      "versions": [
+        1
+      ],
+      "labels": [
+        "latest",
+        "production",
+        "staging"
+      ],
+      "type": "chat",
+      "lastConfig": {}
+    },
+    {
+      "name": "welcome-bot",
+      "tags": [],
+      "lastUpdatedAt": "2026-10-24T21:46:33.987Z",
+      "versions": [
+        1,
+        2
+      ],
+      "labels": [
+        "latest",
+        "production",
+        "staging"
+      ],
+      "type": "text",
+      "lastConfig": {}
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1,
+    "totalItems": 2
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1,
+    "totalItems": 2
+  }
+}
