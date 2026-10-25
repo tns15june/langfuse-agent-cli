@@ -14,7 +14,6 @@ from langfuse_cli.commands.prompt import handle_prompt
 from langfuse_cli.commands.trace import handle_trace
 from langfuse_cli.commands.dataset import handle_dataset
 from langfuse_cli.commands.score import handle_score
-from langfuse_cli.commands.skills import handle_skills
 from langfuse_cli.commands.help_map import handle_help_map, handle_help_describe
 from langfuse_cli.formatters import clean
 
@@ -142,15 +141,7 @@ def create_parser() -> argparse.ArgumentParser:
     p_score_create.add_argument("--comment", help="Optional comment explaining score")
     p_score_create.add_argument("--observation-id", help="Optional observation ID within the trace")
 
-    # 7. Skills command
-    p_skills = subparsers.add_parser("skills", parents=[common_parser], help="Manage companion agent skills")
-    skills_sub = p_skills.add_subparsers(dest="skills_action")
-    skills_sub.add_parser("list", parents=[common_parser], help="List available and installed skills")
-    p_skills_install = skills_sub.add_parser("install", parents=[common_parser], help="Deploy skills to AI agent directories")
-    p_skills_install.add_argument("--target", default="all", help="Target agent: all, claude, antigravity, cursor, opencode, agents")
-    p_skills_install.add_argument("--symlink", action="store_true", help="Symlink skills instead of copying")
-
-    # 8. Help map and progressive disclosure
+    # 7. Help map and progressive disclosure
     subparsers.add_parser("help-map", parents=[common_parser], help="Machine-readable command catalog for AI agents")
     p_help = subparsers.add_parser("help", parents=[common_parser], help="Describe command details")
     p_help.add_argument("target_command", nargs="+", help="Command to describe (e.g. 'prompt get')")
@@ -175,7 +166,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         "trace": handle_trace,
         "dataset": handle_dataset,
         "score": handle_score,
-        "skills": handle_skills,
         "help-map": handle_help_map,
         "help": handle_help_describe,
     }
