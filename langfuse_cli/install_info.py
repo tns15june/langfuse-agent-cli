@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import requests
 
@@ -25,6 +26,17 @@ def install_method(prefix: str = sys.prefix) -> str:
     if "/pipx/venvs/" in path:
         return "pipx"
     return "pip"
+
+
+def find_npx() -> Tuple[Optional[str], str]:
+    """The npx to run, or (None, why not)."""
+    npx = shutil.which("npx")
+    if npx is None:
+        return None, "npx not found; the skills CLI needs Node.js 22.20 or later."
+    # On Windows, which() searches the current folder first; never run an npx that a project folder supplies.
+    if os.path.normcase(os.path.realpath(os.path.dirname(npx))) == os.path.normcase(os.path.realpath(os.getcwd())):
+        return None, f"Not running {npx}: it is in the current folder. Run lf from another folder."
+    return npx, ""
 
 
 def lf_location() -> str:

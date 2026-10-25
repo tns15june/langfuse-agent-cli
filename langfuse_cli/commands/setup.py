@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 
@@ -67,14 +66,9 @@ def _install_skill(interactive: bool) -> str:
     if install_info.installed_skill_ref() == f"v{__version__}":
         print(f"  ✓ Skill v{__version__} is already installed.")
         return "current"
-    npx = shutil.which("npx")
+    npx, why_not = install_info.find_npx()
     if npx is None:
-        print("  ✗ npx not found; the skills CLI needs Node.js 22.20 or later.")
-        print(INSTALL_LATER)
-        return "failed"
-    # On Windows, which() searches the current folder first; never run an npx that a project folder supplies.
-    if os.path.normcase(os.path.realpath(os.path.dirname(npx))) == os.path.normcase(os.path.realpath(os.getcwd())):
-        print(f"  ✗ Not running {npx}: it is in the current folder. Run lf setup from another folder.")
+        print(f"  ✗ {why_not}")
         print(INSTALL_LATER)
         return "failed"
     if interactive and input(f"  Install the {SKILL_NAME} skill for your coding agents? [Y/n] ").strip().lower() in (

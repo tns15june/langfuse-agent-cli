@@ -53,6 +53,21 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
             "Exit code 1 means an authentication or server problem, or that the skill was not installed.",
         ],
     },
+    "upgrade": {
+        "desc": "Upgrade lf with the tool that installed it, then run lf setup for the matching skill",
+        "write": True,
+        "opts": ["--yes"],
+        "rules": ["Changes the user's machine: ask before running it, then pass --yes."],
+    },
+    "uninstall": {
+        "desc": "Remove the agent skill, saved profiles (with their keys) and lf itself",
+        "write": True,
+        "opts": ["--dry-run", "--yes"],
+        "rules": [
+            "Run --dry-run first, show the user the list, and run --yes only after they agree.",
+            "Without --yes it asks in a terminal and refuses without one.",
+        ],
+    },
     "prompt list": {
         "desc": "List prompts with their versions, labels and tags",
         "write": False,

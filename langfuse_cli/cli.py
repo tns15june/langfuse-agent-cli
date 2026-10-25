@@ -11,6 +11,7 @@ from langfuse_cli.commands.auth import handle_auth
 from langfuse_cli.commands.dataset import handle_dataset
 from langfuse_cli.commands.doctor import handle_doctor
 from langfuse_cli.commands.help_map import handle_help_describe, handle_help_map
+from langfuse_cli.commands.lifecycle import handle_uninstall, handle_upgrade
 from langfuse_cli.commands.metrics import AGGREGATIONS, handle_metrics, row_limit
 from langfuse_cli.commands.prompt import handle_prompt
 from langfuse_cli.commands.score import handle_score
@@ -92,6 +93,14 @@ def create_parser() -> argparse.ArgumentParser:
     p_setup.add_argument("-y", "--yes", action="store_true",
                          help="Never prompt: skip login when no working credentials are found and install the skill "
                               "without asking")
+
+    p_upgrade = subparsers.add_parser("upgrade", parents=[common_parser],
+                                      help="Upgrade lf with uv or pipx, then reinstall the matching skill")
+    p_upgrade.add_argument("-y", "--yes", action="store_true", help="Run the follow-up lf setup without prompts")
+    p_uninstall = subparsers.add_parser("uninstall", parents=[common_parser],
+                                        help="Remove the agent skill, saved profiles and lf itself")
+    p_uninstall.add_argument("--dry-run", action="store_true", help="Show what would be removed and stop")
+    p_uninstall.add_argument("-y", "--yes", action="store_true", help="Remove without asking")
 
     # 3. Prompt command
     p_prompt = subparsers.add_parser("prompt", parents=[common_parser], help="Inspect and manage prompt versions")
@@ -195,6 +204,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "auth": handle_auth,
         "doctor": handle_doctor,
         "setup": handle_setup,
+        "upgrade": handle_upgrade,
+        "uninstall": handle_uninstall,
         "prompt": handle_prompt,
         "trace": handle_trace,
         "dataset": handle_dataset,
