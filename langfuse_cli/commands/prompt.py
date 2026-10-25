@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from langfuse_cli.client import LangfuseClient
 from langfuse_cli.config import resolve_from_args
-from langfuse_cli.formatters.agent import format_agent_output
+from langfuse_cli.formatters.agent import print_json
 
 
 def compile_mustache(template: str, vars_dict: Dict[str, Any]) -> str:
@@ -41,12 +41,11 @@ def compile_prompt(prompt_data: Any, vars_dict: Dict[str, Any]) -> Any:
 
 def handle_prompt(args: argparse.Namespace) -> int:
     client = LangfuseClient(resolve_from_args(args))
-    compact, agent_fields = args.compact, args.agent_fields
 
     if args.prompt_action == "list":
         prompts = client.list_prompts(limit=args.limit, tag=args.tag).get("data", [])
         if args.output == "json":
-            print(format_agent_output(prompts, compact=compact, agent_fields=agent_fields))
+            print_json(args, prompts)
         elif not prompts:
             print("No prompts found.")
         else:
@@ -76,7 +75,7 @@ def handle_prompt(args: argparse.Namespace) -> int:
             prompt["applied_vars"] = vars_dict
 
         if args.output == "json":
-            print(format_agent_output(prompt, compact=compact, agent_fields=agent_fields))
+            print_json(args, prompt)
         else:
             print(f"Prompt: {prompt.get('name')} (v{prompt.get('version')})")
             print(f"Type: {prompt.get('type', 'text')}")
@@ -118,7 +117,7 @@ def handle_prompt(args: argparse.Namespace) -> int:
         tags=[tag.strip() for tag in args.tags.split(",")] if args.tags else None,
     )
     if args.output == "json":
-        print(format_agent_output(created, compact=compact, agent_fields=agent_fields))
+        print_json(args, created)
     else:
         print(f"✓ Prompt '{args.name}' (v{created.get('version', 'new')}) published successfully.")
     return 0

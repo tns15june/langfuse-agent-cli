@@ -5,7 +5,7 @@ import argparse
 
 from langfuse_cli.client import LangfuseClient
 from langfuse_cli.config import resolve_from_args
-from langfuse_cli.formatters.agent import format_agent_output
+from langfuse_cli.formatters.agent import print_json
 
 
 def handle_dataset(args: argparse.Namespace) -> int:
@@ -14,7 +14,7 @@ def handle_dataset(args: argparse.Namespace) -> int:
     if args.dataset_action == "list":
         datasets = client.list_datasets().get("data", [])
         if args.output == "json":
-            print(format_agent_output(datasets, compact=args.compact, agent_fields=args.agent_fields))
+            print_json(args, datasets)
         elif not datasets:
             print("No datasets found.")
         else:
@@ -27,7 +27,7 @@ def handle_dataset(args: argparse.Namespace) -> int:
     dataset = client.get_dataset(args.name)
     dataset["items"] = client.list_dataset_items(args.name).get("data", [])
     if args.output == "json":
-        print(format_agent_output(dataset, compact=args.compact, agent_fields=args.agent_fields))
+        print_json(args, dataset)
     else:
         print(f"Dataset: {dataset.get('name')}")
         print(f"Description: {dataset.get('description')}")

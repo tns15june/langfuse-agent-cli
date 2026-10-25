@@ -28,6 +28,7 @@ COMMON_DEFAULTS = {
     "output": "json",
     "compact": False,
     "agent_fields": None,
+    "output_summary": False,
 }
 
 
@@ -56,6 +57,8 @@ def create_parser() -> argparse.ArgumentParser:
     common("-o", "--output", choices=["json", "text"], default=unset, help="Output format (default: json)")
     common("--compact", action="store_true", default=unset, help="Drop null and empty fields from JSON output")
     common("--agent-fields", default=unset, help="Comma-separated field paths to keep in JSON output")
+    common("--output-summary", action="store_true", default=unset,
+           help="With JSON output, write output over 16 KB to a file and print its path, size and keys instead")
 
     parser = argparse.ArgumentParser(
         prog="lf",

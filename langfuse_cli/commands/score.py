@@ -5,7 +5,7 @@ import argparse
 
 from langfuse_cli.client import LangfuseClient
 from langfuse_cli.config import resolve_from_args
-from langfuse_cli.formatters.agent import format_agent_output
+from langfuse_cli.formatters.agent import print_json
 
 
 def handle_score(args: argparse.Namespace) -> int:
@@ -18,7 +18,7 @@ def handle_score(args: argparse.Namespace) -> int:
         observation_id=args.observation_id,
     )
     if args.output == "json":
-        print(format_agent_output(res, compact=args.compact, agent_fields=args.agent_fields))
+        print_json(args, res)
     else:
         print(f"✓ Score '{args.name}'={args.value} recorded for trace '{args.trace_id}'.")
     return 0

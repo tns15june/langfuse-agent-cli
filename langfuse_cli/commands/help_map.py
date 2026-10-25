@@ -68,13 +68,13 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
         "desc": "List traces newest first; --status error lists failing traces with their errors",
         "write": False,
         "opts": ["--status <all|error>", "--session-id <id>", "--user-id <id>", "--from-ts <iso>", "--to-ts <iso>",
-                 "--limit <n>", "--compact", "--agent-fields <paths>"],
+                 "--limit <n>", "--compact", "--agent-fields <paths>", "--output-summary"],
         "rules": ["--limit counts traces, also with --status error."],
     },
     "trace get": {
         "desc": "All observations of one trace; --timeline renders them as a tree",
         "write": False,
-        "opts": ["<trace_id>", "--timeline", "--io", "--compact", "--agent-fields <paths>"],
+        "opts": ["<trace_id>", "--timeline", "--io", "--compact", "--agent-fields <paths>", "--output-summary"],
         "rules": [
             "Inputs and outputs are left out unless --io is given; they are often large.",
             "Metadata, prompt links and trace tags are not fetched.",
@@ -83,7 +83,7 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
     "trace session": {
         "desc": "Traces of one session, oldest first (the newest 1000)",
         "write": False,
-        "opts": ["<session_id>", "--compact", "--agent-fields <paths>"],
+        "opts": ["<session_id>", "--compact", "--agent-fields <paths>", "--output-summary"],
         "rules": [],
     },
     "dataset list": {
@@ -95,7 +95,7 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
     "dataset get": {
         "desc": "A dataset with the first page of its items",
         "write": False,
-        "opts": ["<name>", "--compact"],
+        "opts": ["<name>", "--compact", "--output-summary"],
         "rules": [],
     },
     "score create": {

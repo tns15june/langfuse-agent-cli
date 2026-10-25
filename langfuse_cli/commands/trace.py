@@ -7,10 +7,11 @@ from typing import Any, Dict, Iterable, List
 
 from langfuse_cli.client import LangfuseClient
 from langfuse_cli.config import resolve_from_args
-from langfuse_cli.formatters.agent import format_agent_output
+from langfuse_cli.formatters.agent import print_json
 from langfuse_cli.formatters.timeline import render_trace_timeline
 
 # Field groups of GET /api/public/v2/observations. "metrics" carries latency; the spec puts it there.
+# Langfuse 4.70 returns latency null instead of 0 for zero-length observations when "metrics" is requested.
 ROOT_FIELDS = "core,basic,metrics"  # a trace is listed as its root observation
 TREE_FIELDS = "core,basic,time,model,usage,metrics"  # leaves out io (--io adds it), metadata, prompt, trace_context
 
@@ -36,7 +37,7 @@ def _trace_line(row: Dict[str, Any]) -> str:
 
 def _emit(args: argparse.Namespace, rows: List[Dict[str, Any]], lines: List[str], empty: str) -> int:
     if args.output == "json":
-        print(format_agent_output(rows, compact=args.compact, agent_fields=args.agent_fields))
+        print_json(args, rows)
     else:
         print("\n".join(lines) if lines else empty)
     return 0
@@ -72,7 +73,7 @@ def handle_trace(args: argparse.Namespace) -> int:
         if args.timeline or args.output == "text":
             print(render_trace_timeline(args.trace_id, observations))
         else:
-            print(format_agent_output(observations, compact=args.compact, agent_fields=args.agent_fields))
+            print_json(args, observations)
         return 0
 
     # session: its traces, oldest first, so a conversation reads top to bottom
