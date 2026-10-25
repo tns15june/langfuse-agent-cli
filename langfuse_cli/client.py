@@ -49,12 +49,19 @@ class LangfuseClient:
                 params=params,
                 json=data if data else None,
                 timeout=self.timeout,
+                allow_redirects=method == "GET",  # requests would replay a redirected POST as a GET
             )
         except requests.exceptions.ConnectionError as e:
             raise LangfuseAPIError(f"Connection failed to {self.host}: {e}") from e
         except requests.exceptions.Timeout as e:
             raise LangfuseAPIError(f"Request timed out connecting to {self.host} ({self.timeout}s)") from e
+        except requests.exceptions.RequestException as e:  # e.g. a host without http(s)://
+            raise LangfuseAPIError(f"Request to {url} failed: {e}") from e
 
+        if resp.is_redirect:  # only writes get here; a 3xx also counts as resp.ok
+            location = resp.headers.get("Location")
+            raise LangfuseAPIError(f"{method} {path} was redirected to {location}; set the host to the final URL",
+                                   status_code=resp.status_code)
         if not resp.ok:
             try:
                 message = resp.json().get("message")
@@ -68,12 +75,13 @@ class LangfuseClient:
                 error_msg = f"HTTP {resp.status_code} on {path}: {resp.text[:200]}"
             raise LangfuseAPIError(error_msg, status_code=resp.status_code, response_body=resp.text)
 
-        if not resp.content:
-            return {}
         try:
-            return resp.json()
-        except Exception:
-            return {"raw": resp.text}
+            return resp.json()  # every endpoint lf calls answers 2xx with a JSON body
+        except ValueError as e:
+            kind = resp.headers.get("Content-Type") or "no content type"
+            raise LangfuseAPIError(f"HTTP {resp.status_code} on {path} is not JSON ({kind}); is a login page or proxy "
+                                   "answering instead of Langfuse?", status_code=resp.status_code,
+                                   response_body=resp.text) from e
 
     # 1. System Health
     def health(self) -> Dict[str, Any]:

@@ -25,9 +25,9 @@ class FakeAPI:
         self.calls = []  # (method, path, params) with params as sent on the wire
         self.bodies = []  # JSON request bodies, parallel to calls
 
-    def route(self, method, path, json=None, status=200, text=None, content_type="application/json"):
+    def route(self, method, path, json=None, status=200, text=None, content_type="application/json", headers=None):
         """Queue a response; several routes for one path are served in order, the last one repeats."""
-        self.routes.setdefault((method, path), []).append((json, status, text, content_type))
+        self.routes.setdefault((method, path), []).append((json, status, text, content_type, headers or {}))
 
     def __call__(self, method, url, params=None, json=None, **kwargs):
         # Installed as a class attribute on requests.Session; an instance is not bound, so no session arg.
@@ -38,11 +38,12 @@ class FakeAPI:
         queue = self.routes.get((method, path))
         if not queue:
             raise AssertionError(f"unrouted request: {method} {path}")
-        body, status, text, content_type = queue.pop(0) if len(queue) > 1 else queue[0]
+        body, status, text, content_type, headers = queue.pop(0) if len(queue) > 1 else queue[0]
         resp = requests.Response()
         resp.status_code = status
         resp.url = url
         resp.headers["Content-Type"] = content_type
+        resp.headers.update(headers)
         resp._content = (text if text is not None else jsonlib.dumps(body or {})).encode()
         return resp
 

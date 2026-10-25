@@ -124,3 +124,13 @@ def test_auth_status_rejects_bad_keys(fake_api, capsys):
 
     assert code == 1
     assert "Invalid credentials" in out
+
+
+def test_doctor_fails_when_the_host_answers_with_a_web_page(fake_api, capsys, no_skill_dirs):
+    for path in ("/api/public/health", "/api/public/projects", OBS):
+        fake_api.route("GET", path, text="<html>Sign in</html>", content_type="text/html")
+
+    code, out, _ = run(capsys, "doctor")
+
+    assert code == 1
+    assert "API Authorization: Valid" not in out

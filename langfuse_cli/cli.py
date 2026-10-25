@@ -175,7 +175,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sys.stdout, sys.stderr = _SafeStream(sys.stdout), _SafeStream(sys.stderr)
     try:
         return handlers[args.command](args)
-    except (LangfuseAPIError, ConfigError) as e:
+    except (LangfuseAPIError, ConfigError, OSError) as e:  # OSError: --file, the profiles file
         print(f"Error: {e}", file=sys.stderr)
         return 1
     finally:
