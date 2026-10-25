@@ -8,7 +8,7 @@ import pytest
 from langfuse_cli.cli import create_parser
 
 ROOT = Path(__file__).resolve().parent.parent
-DOC_FILES = sorted((ROOT / "skills").rglob("*.md"))
+DOC_FILES = sorted((ROOT / "skills").rglob("*.md")) + [ROOT / "README.md"]
 INLINE_COMMAND = re.compile(r"`(lf [^`]+)`")
 
 
@@ -40,5 +40,6 @@ def test_docs_contain_commands():
 def test_documented_commands_parse(source, argv):
     try:
         create_parser().parse_args(argv[1:])
-    except SystemExit:
-        pytest.fail(f"{source}: documented command does not parse: {' '.join(argv)}")
+    except SystemExit as exc:
+        if exc.code not in (0, None):  # --version and --help exit 0 on purpose
+            pytest.fail(f"{source}: documented command does not parse: {' '.join(argv)}")

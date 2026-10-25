@@ -1,127 +1,114 @@
-# RFC: Agent-Native CLI and Coding Assistant Skills (`langfuse-cli`)
+# RFC: Agent-friendly output for `@langfuse/cli`: proposal and prototype
 
-**Author**: Tarkeshwar Narayan (@tns15june)  
-**Repository**: [https://github.com/tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli)  
-**Status**: Proposal / Working Prototype Available  
-**Target**: `langfuse/langfuse` Community & Ecosystem  
+**Author**: Tarkeshwar Narayan (tns15june)
+**Status**: Draft for discussion
+**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.2.0
 
----
+## Summary
 
-## 1. Executive Summary
+Langfuse already has an official CLI and official agent skills. This RFC proposes three small,
+separable features for `@langfuse/cli` that let coding agents control how much of a response reaches
+their context, plus two rules for `langfuse/skills`. Each feature is prototyped in
+`langfuse-agent-cli` or measured below.
 
-As AI coding assistants (Claude Code, Cursor, Antigravity, OpenCode, GitHub Copilot) become standard development environments for engineers building LLM applications, there is an increasing friction: **developers constantly switch between their terminal/codebase and the Langfuse Web UI** to inspect traces, pull/test prompts, and triage runtime errors.
+## What exists today
 
-Furthermore, when AI coding agents attempt to debug LLM applications autonomously, standard API dumps return verbose, uncompressed JSON (50KB–200KB per trace) that quickly bloats the agent's context window.
+- **`@langfuse/cli`** ([langfuse/langfuse-cli](https://github.com/langfuse/langfuse-cli)) is generated
+  from the OpenAPI spec and covers every endpoint. It has schema discovery (`api schema --json`),
+  `--all` pagination, API snapshots for older self-hosted servers (`--api-version`), documented exit
+  codes, and conformance tests across Langfuse versions.
+- **`langfuse/skills`** ships the `langfuse` skill, which uses the CLI and the documentation with
+  use-case references, and installs with `npx skills add langfuse/skills` or as a plugin. An open PR
+  adds hosted-skill install and push to the CLI (langfuse-cli#27).
+- **The server already trims payloads**: `GET /api/public/v2/observations` returns only the field
+  groups a request asks for.
 
-This RFC proposes **an Agent-Native CLI (`lf`) and Companion Skills library for Langfuse**, modeled after the architectural successes of Atlassian's **Teamwork Graph (TWG) CLI**. A fully tested, functional working prototype has been developed and verified against local Langfuse (`v4.30.0`).
+What is missing for agents is control over the size of what gets printed: a list or a trace with its
+inputs can run to hundreds of kilobytes, most of which the agent never reads.
 
----
+## Measurements
 
-## 2. Key Pain Points & Motivation
+Langfuse 4.70.0, synthetic data seeded with `scripts/seed_langfuse.py` from the prototype. Real
+traffic has longer messages and more metadata, so the numbers will differ.
 
-1. **Prompt Management in Code**:
-   Developers writing agent prompts or evaluation harnesses must leave their IDE to inspect prompt versions, copy Mustache templates, or verify variable substitutions. An agent-native command (`lf prompt get <name> --vars '{...}'`) brings prompt compilation directly into local test loops.
-2. **Observability Triage Without Context Switching**:
-   When a local integration test or evaluation fails, human engineers and AI coding assistants need instant visibility into failing tool calls, model outputs, and latency without opening a browser tab.
-3. **Agent Token Consumption**:
-   Traditional REST responses contain extensive metadata, raw system prompts, and full execution payloads. Coding agents need **compact, token-efficient projections** (`--compact`, `--agent-fields`) that extract high-signal indicators (errors, model names, latency, cost) while saving 80–90% of token context.
-4. **Agent Skill Fragmentation**:
-   Different tools look in different locations for skill definitions (`~/.claude/skills`, `~/.agents/skills`, `~/.cursor/skills`, `~/.gemini/config/skills`). A unified CLI command (`lf skills install`) provides automated, multi-platform deployment.
+| Request | Size |
+| --- | --- |
+| One trace with 3 observations, all field groups | 12.9 KB |
+| The same trace, `fields=core,basic,time,model,usage` | 2.9 KB (−78%) |
+| The same trace, default `core,basic` | 1.65 KB (−88%) |
+| `npx @langfuse/cli api observations list --level ERROR` (4 rows) | 3.0 KB |
+| The same output, keeping 7 triage fields | 1.05 KB (−66%) |
+| The same output, dropping null and empty-string fields | 2.4 KB (−21%) |
 
----
+## Proposals
 
-## 3. Architecture & Design Principles
+### 1. Large-output envelope
 
-Inspired by Atlassian's TWG CLI, the design rests on four pillars:
+**Problem.** One command can return more JSON than an agent can afford to read.
 
-```text
-┌────────────────────────────────────────────────────────┐
-│             AI Coding Assistants & Humans              │
-│     (Claude Code, Cursor, Antigravity, Terminal)       │
-└───────────────────────────┬────────────────────────────┘
-                            │
-         ┌──────────────────┴──────────────────┐
-         ▼                                     ▼
-┌───────────────────────────────┐   ┌───────────────────────────────┐
-│     Agent Companion Skills    │   │        Langfuse CLI (lf)      │
-│  - skills/langfuse/SKILL.md   │   │  - Auth Profiles & Doctor     │
-│  - langfuse-prompts/SKILL.md  │◄──┤  - Output Compactor & Fields  │
-│  - langfuse-traces/SKILL.md   │   │  - Progressive Disclosure     │
-└───────────────┬───────────────┘   └───────────────┬───────────────┘
-                │                                   │
-                └─────────────────┬─────────────────┘
-                                  ▼
-                    ┌───────────────────────────┐
-                    │     Langfuse Public API   │
-                    │   (Cloud & Self-Hosted)   │
-                    └───────────────────────────┘
-```
+**Proposal.** `--output-summary auto`: when the JSON payload exceeds a threshold (for example
+16 KB), write it to a file and print a short envelope instead, with the file path, byte size, row
+count, the keys of the first row and the next cursor. Below the threshold, print the payload as
+today. See Prior art.
 
-### Pillar 1: Progressive Disclosure (`help-map` & `describe`)
-AI coding assistants perform better when they can dynamically discover available operations without reading bloated documentation:
-- `lf help-map`: Returns a compact catalog of commands, their purpose, and whether they mutate state (`*`).
-- `lf help describe "<command>"`: Emits a structured JSON schema detailing exact options, types, and execution rules.
+**Prototype.** Not yet.
 
-### Pillar 2: Token-Saving Formatters
-- `--compact`: Aggregates errors, flattens durations, lists distinct models used, and removes redundant trace attributes.
-- `--agent-fields <paths>`: Projects nested JSON fields down to exact developer-requested attributes.
+### 2. Field projection and pruning
 
-### Pillar 3: Terminal Timeline Visualizer
-`lf trace get <trace-id> --timeline` renders a clean ASCII observation tree highlighting tool calls, latencies, and error messages.
+**Problem.** Rows carry fields an agent rarely needs for a given task (prices, flags, nulls).
 
-### Pillar 4: Multi-Agent Companion Skills
-The companion skills (`SKILL.md`) adhere to the open Agent Skills standard and are automatically installed and synced to:
-- Claude Code (`~/.claude/skills/`)
-- Antigravity (`~/.gemini/config/skills/`)
-- Universal Agents (`~/.agents/skills/`)
-- Cursor (`~/.cursor/skills/`)
-- OpenCode (`~/.config/opencode/skills/`)
+**Proposal.** `--select a,b.c` keeps only the listed fields of each row, with dotted paths that reach
+through lists; `--compact` drops null and empty values at every level; optional named presets per
+resource, for example `--select @triage` on observations (id, traceId, name, level, statusMessage,
+sessionId, startTime).
 
----
+**Measured.** −66% for the 7-field triage projection and −21% for pruning alone, on the CLI's own
+error output (table above).
 
-## 4. Command Specification
+**Prototype.** `--agent-fields` and `--compact` in `langfuse_cli/formatters/agent.py`. Both work on
+any JSON response, so they need no per-endpoint code in a generated CLI.
 
-| Command Family | Operations | Key Capabilities |
-|---|---|---|
-| **Auth & Config** | `lf auth login`, `switch`, `list`, `status` | Supports multiple profiles (`local`, `staging`, `prod`, `cloud`), masked keys, and standard `LANGFUSE_*` env vars. |
-| **Diagnostics** | `lf doctor` | End-to-end audit of API health, auth validity, and agent skill installations. |
-| **Prompts** | `lf prompt list`, `get`, `push` | Fetch by version/label, compile Mustache templates inline with `--vars '{"key": "val"}'`, publish from files or raw text. |
-| **Traces** | `lf trace list`, `get`, `session` | Filter by status (`error`), session ID, time windows; `--timeline` ASCII tree renderer; `--compact` agent format. |
-| **Datasets & Evals** | `lf dataset list`, `get`, `run`, `lf score create` | Inspect ground-truth items, trigger evaluation runs, and record quantitative scores on traces. |
-| **Agent Skills** | `lf skills list`, `install` | Discovers and deploys companion skills across all installed coding assistant directories. |
+### 3. Saved profiles, `doctor` and `whoami`
 
----
+**Problem.** People and agents switch between local, staging and Cloud projects by juggling
+environment variables or `.env` files. When a call fails, no single command says whether the keys,
+the host or the server version is the cause.
 
-## 5. Working Prototype Validation
+**Proposal.** `langfuse auth login|switch|list|status` with named profiles stored in a file readable
+only by the user, and `langfuse doctor`, which checks that the host is reachable, that the keys are
+valid (`GET /api/public/projects`), that the server has the endpoints the CLI needs (for example
+`/api/public/v2/observations`), and where each credential came from. Host and keys should always
+come from the same source: a host from one place, such as a cloned repository's `.env`, should never
+receive keys that came from another.
 
-A working implementation was developed and validated against a local self-hosted Langfuse stack (`v4.30.0`):
+**Prototype.** `lf auth …` and `lf doctor`.
 
-1. **Diagnostics (`lf doctor`)**:
-   Successfully verified local host connectivity on `:3000`, validated API key authorization against the traces probe, and inspected skill directory health.
-2. **Trace Inspection (`lf trace list --compact`)**:
-   Verified that trace outputs are compressed into token-efficient payloads with observation error extraction.
-3. **Trace Timeline (`lf trace get <id> --timeline`)**:
-   Rendered execution timelines of tool calls and latencies.
-4. **Prompt Lifecycle (`lf prompt push` & `lf prompt get`)**:
-   Published a test prompt `welcome-bot` (v1) and compiled Mustache variables (`{{user_name}}`, `{{plan}}`) into the final output.
-5. **Automated Test Suite**:
-   Pytest suite covering config management, template compilation, agent formatters, and skill deployment passed (100% pass rate).
+### For `langfuse/skills`
 
----
+1. **Write safety.** Before a write (prompt create, score create, dataset item create), read the
+   current state and tell the user what will change, unless they asked for the write.
+2. **Setup guard.** The `langfuse` skill already tells agents not to ask for keys in chat. Extend
+   that to commands that prompt for credentials: ask the user to run them.
 
-## 6. Proposed Contribution Paths
+A separate, small pull request adds field-selection and `--level ERROR` tips to
+`skills/langfuse/references/cli.md`.
 
-We would love feedback from the Langfuse maintainers and community on the preferred path forward:
+## Non-goals
 
-- **Option A (Official Monorepo Package)**:
-  Contribute as an official package under `packages/cli` in `langfuse/langfuse`, published to npm/PyPI under `@langfuse/cli` or `langfuse-cli`.
-- **Option B (Community Ecosystem Project)**:
-  Maintain as an independent, community-driven open-source project (`langfuse-agent-cli`), featured in the official Langfuse ecosystem documentation and integration directory.
+- A second CLI. The prototype exists to test these ideas against real servers; once they land
+  upstream it has done its job.
+- Higher-level commands such as trace trees or error grouping in `@langfuse/cli`. They may fit the
+  skill better, as recipes, unless the maintainers want them in the CLI.
 
----
+## Questions for maintainers
 
-## 7. Next Steps
+1. Would pull requests for proposals 1–3 fit the generated design of `@langfuse/cli`, as global
+   flags with no per-endpoint code?
+2. What threshold and file location would suit the envelope?
+3. Should credentials stay environment and `.env` only, or is there interest in profiles?
 
-1. Publish prototype to a public GitHub repository with open MIT license.
-2. Share RFC on Langfuse GitHub Discussions and Discord (`#contributing` / `#showcase`).
-3. Gather feedback from the Langfuse core team (Marc Klingen, Clemens Rawert, Max Deichmann) and community users.
+## Prior art
+
+The command map (`help-map`), the `--agent-fields` option and the summary envelope
+(`--output-summary`) come from Atlassian's
+[Teamwork Graph CLI](https://developer.atlassian.com/platform/teamwork-graph/twg-cli/getting-started/installation/).
