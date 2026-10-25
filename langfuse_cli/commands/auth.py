@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import sys
-from typing import List
 
 from langfuse_cli.config import ConfigManager
 from langfuse_cli.client import LangfuseClient, LangfuseAPIError
@@ -22,7 +22,7 @@ def handle_auth(args: argparse.Namespace) -> int:
         if not public_key:
             public_key = input("Enter Langfuse Public Key (pk-lf-...): ").strip()
         if not secret_key:
-            secret_key = input("Enter Langfuse Secret Key (sk-lf-...): ").strip()
+            secret_key = getpass.getpass("Enter Langfuse Secret Key (sk-lf-...): ").strip()
 
         cfg.save_profile(
             name=profile_name,
@@ -33,14 +33,13 @@ def handle_auth(args: argparse.Namespace) -> int:
         )
         print(f"✓ Profile '{profile_name}' saved successfully ({host}).")
 
-        # Test connectivity
-        prof = cfg.resolve_profile(name=profile_name)
-        client = LangfuseClient(prof)
+        client = LangfuseClient(cfg.resolve_profile(name=profile_name))
         try:
-            h = client.health()
-            print(f"✓ Verified connectivity: Langfuse server status {h.get('status', 'OK')} (v{h.get('version', 'unknown')})")
-        except Exception as e:
-            print(f"⚠ Warning: Could not verify connectivity immediately: {e}")
+            projects = client.get_project().get("data") or []
+        except LangfuseAPIError as e:
+            print(f"⚠ Profile saved, but the keys could not be verified: {e}", file=sys.stderr)
+            return 1
+        print(f"✓ Keys verified for project: {', '.join(p.get('name', '?') for p in projects) or '(none)'}")
         return 0
 
     elif subaction == "switch":

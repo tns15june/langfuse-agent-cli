@@ -12,6 +12,10 @@ DEFAULT_CONFIG_DIR = Path.home() / ".config" / "langfuse"
 DEFAULT_PROFILES_FILE = DEFAULT_CONFIG_DIR / "profiles.json"
 
 
+class ConfigError(Exception):
+    """Credentials or the profiles file cannot be used as given."""
+
+
 @dataclass
 class ProfileConfig:
     name: str

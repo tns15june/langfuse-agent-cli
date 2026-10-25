@@ -54,13 +54,16 @@ class LangfuseClient:
             raise LangfuseAPIError(f"Request timed out connecting to {self.host} ({self.timeout}s)") from e
 
         if not resp.ok:
-            error_msg = f"HTTP {resp.status_code} on {path}: {resp.text}"
             try:
-                err_json = resp.json()
-                if "message" in err_json:
-                    error_msg = f"HTTP {resp.status_code}: {err_json['message']}"
-            except Exception:
-                pass
+                message = resp.json().get("message")
+            except (ValueError, AttributeError):
+                message = None
+            if message:
+                error_msg = f"HTTP {resp.status_code}: {message}"
+            elif "html" in resp.headers.get("Content-Type", ""):
+                error_msg = f"HTTP {resp.status_code} on {path}"  # framework error pages carry no detail
+            else:
+                error_msg = f"HTTP {resp.status_code} on {path}: {resp.text[:200]}"
             raise LangfuseAPIError(error_msg, status_code=resp.status_code, response_body=resp.text)
 
         if not resp.content:
@@ -73,6 +76,10 @@ class LangfuseClient:
     # 1. System Health
     def health(self) -> Dict[str, Any]:
         return self._request("GET", "/api/public/health")
+
+    def get_project(self) -> Dict[str, Any]:
+        """Project the API key belongs to; a cheap check that the keys are valid."""
+        return self._request("GET", "/api/public/projects")
 
     # 2. Prompts API
     def list_prompts(
