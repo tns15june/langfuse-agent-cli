@@ -7,20 +7,13 @@ import sys
 from typing import List, Dict, Any, Optional
 
 from langfuse_cli.client import LangfuseClient, LangfuseAPIError
-from langfuse_cli.config import ConfigManager
+from langfuse_cli.config import resolve_from_args
 from langfuse_cli.formatters.agent import format_agent_output, compact_trace
 from langfuse_cli.formatters.timeline import render_trace_timeline
 
 
 def handle_trace(args: argparse.Namespace) -> int:
-    cfg = ConfigManager()
-    prof = cfg.resolve_profile(
-        name=getattr(args, "profile", None),
-        host_override=getattr(args, "host", None),
-        pk_override=getattr(args, "public_key", None),
-        sk_override=getattr(args, "secret_key", None),
-        env_file=getattr(args, "env_file", None),
-    )
+    prof = resolve_from_args(args)
     client = LangfuseClient(prof)
     action = getattr(args, "trace_action", "list")
     out_format = getattr(args, "output", "json")

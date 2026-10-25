@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from langfuse_cli import __version__
-from langfuse_cli.config import ConfigManager
+from langfuse_cli.config import ConfigManager, resolve_from_args
 from langfuse_cli.client import LangfuseClient, LangfuseAPIError
 
 
@@ -21,13 +21,7 @@ KNOWN_SKILL_TARGETS = [
 
 def handle_doctor(args: argparse.Namespace) -> int:
     cfg = ConfigManager()
-    prof = cfg.resolve_profile(
-        name=getattr(args, "profile", None),
-        host_override=getattr(args, "host", None),
-        pk_override=getattr(args, "public_key", None),
-        sk_override=getattr(args, "secret_key", None),
-        env_file=getattr(args, "env_file", None),
-    )
+    prof = resolve_from_args(args)
 
     print("\nLangfuse Agent CLI System Diagnostics")
     print("=" * 45)

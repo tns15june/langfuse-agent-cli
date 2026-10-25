@@ -5,7 +5,7 @@ import argparse
 import getpass
 import sys
 
-from langfuse_cli.config import ConfigManager
+from langfuse_cli.config import ConfigManager, resolve_from_args
 from langfuse_cli.client import LangfuseClient, LangfuseAPIError
 
 
@@ -68,7 +68,7 @@ def handle_auth(args: argparse.Namespace) -> int:
         return 0
 
     # Default: status
-    prof = cfg.resolve_profile(name=getattr(args, "profile", None))
+    prof = resolve_from_args(args)
     print(f"Current Profile: {prof.name}")
     print(f"Host: {prof.host}")
     print(f"Public Key: {prof.masked_public_key()}")

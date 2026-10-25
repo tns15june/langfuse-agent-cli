@@ -1,9 +1,11 @@
 """Configuration and profile management for Langfuse CLI."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
-from dataclasses import dataclass, asdict
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -22,6 +24,7 @@ class ProfileConfig:
     host: str
     public_key: str
     secret_key: str
+    source: str = ""  # where host and keys came from: "profile", "env" or "env-file"
 
     def is_complete(self) -> bool:
         return bool(self.host and self.public_key and self.secret_key)
@@ -48,34 +51,34 @@ class ConfigManager:
         self.config_path = config_path or DEFAULT_PROFILES_FILE
         self._cache: Optional[Dict[str, Any]] = None
 
-    def _ensure_dir(self) -> None:
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-
     def _load_raw(self) -> Dict[str, Any]:
         if self._cache is not None:
             return self._cache
-        if not self.config_path.exists():
-            self._cache = {"current_profile": "default", "profiles": {}}
-            return self._cache
-        try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                self._cache = json.load(f)
-                if "profiles" not in self._cache:
-                    self._cache["profiles"] = {}
-                return self._cache
-        except Exception:
-            self._cache = {"current_profile": "default", "profiles": {}}
-            return self._cache
+        data: Any = {}
+        if self.config_path.exists():
+            try:
+                data = json.loads(self.config_path.read_text(encoding="utf-8"))
+            except ValueError as e:
+                # Refuse to continue: the next save would silently drop every saved profile.
+                raise ConfigError(f"{self.config_path} is not valid JSON; fix or delete it") from e
+            if not isinstance(data, dict):
+                raise ConfigError(f"{self.config_path} is not a profiles file; fix or delete it")
+        data.setdefault("current_profile", "default")
+        data.setdefault("profiles", {})
+        self._cache = data
+        return data
 
     def _save_raw(self, data: Dict[str, Any]) -> None:
-        self._ensure_dir()
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        # secure file permissions
+        # The file holds secret keys: create directory and file private from the start, then swap it in.
+        self.config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=self.config_path.parent, prefix=".profiles-")
         try:
-            os.chmod(self.config_path, 0o600)
-        except OSError:
-            pass
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, self.config_path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
         self._cache = data
 
     def list_profiles(self) -> Dict[str, ProfileConfig]:
@@ -87,6 +90,7 @@ class ConfigManager:
                 host=p.get("host", ""),
                 public_key=p.get("public_key", ""),
                 secret_key=p.get("secret_key", ""),
+                source="profile",
             )
         return profiles
 
@@ -125,66 +129,59 @@ class ConfigManager:
         sk_override: Optional[str] = None,
         env_file: Optional[str] = None,
     ) -> ProfileConfig:
-        """Resolves config with precedence: CLI overrides > Named Profile > Env vars."""
-        # 1. Start from named or current profile
-        target_name = name or os.environ.get("LANGFUSE_PROFILE") or self.get_current_profile_name()
-        profiles = self.list_profiles()
-        base = profiles.get(
-            target_name,
-            ProfileConfig(name=target_name, host="", public_key="", secret_key=""),
-        )
+        """Take host and keys from one source, then apply explicit flag overrides.
 
-        host = base.host
-        pk = base.public_key
-        sk = base.secret_key
-
-        # 2. Check .env if requested or fallback to env vars if profile is incomplete
-        env_dict = {}
-        if env_file and os.path.exists(env_file):
-            env_dict = self._parse_dotenv(env_file)
-        elif not base.is_complete() and os.path.exists(".env"):
-            env_dict = self._parse_dotenv(".env")
-
-        # Fallback to environment variables / dotenv values if not present in profile
-        if not host:
-            host = os.environ.get("LANGFUSE_HOST") or env_dict.get("LANGFUSE_HOST") or ""
-        if not pk:
-            pk = os.environ.get("LANGFUSE_PUBLIC_KEY") or env_dict.get("LANGFUSE_PUBLIC_KEY") or ""
-        if not sk:
-            sk = os.environ.get("LANGFUSE_SECRET_KEY") or env_dict.get("LANGFUSE_SECRET_KEY") or ""
-
-        # 3. Command line flag overrides (highest precedence)
-        if host_override:
-            host = host_override
-        if pk_override:
-            pk = pk_override
-        if sk_override:
-            sk = sk_override
-
-        # Default host fallback if empty
-        if not host:
-            host = "https://cloud.langfuse.com"
+        Sources, first match wins: --env-file, --profile / LANGFUSE_PROFILE, LANGFUSE_* environment
+        variables, the saved current profile. Sources are never mixed, so a host found in one place
+        (a cloned repo's .env, say) cannot receive keys that came from another.
+        """
+        explicit = name or os.environ.get("LANGFUSE_PROFILE")
+        if env_file:
+            base = self._from_vars(self._parse_dotenv(env_file), "env-file")
+        elif explicit:
+            base = self.list_profiles().get(explicit)
+            if base is None:
+                raise ConfigError(f"profile '{explicit}' not found; see 'lf auth list'")
+        elif os.environ.get("LANGFUSE_PUBLIC_KEY") or os.environ.get("LANGFUSE_SECRET_KEY"):
+            base = self._from_vars(os.environ, "env")
+        else:
+            current = self.get_current_profile_name()
+            base = self.list_profiles().get(current) or ProfileConfig(current, "", "", "", "profile")
 
         return ProfileConfig(
-            name=target_name,
-            host=host.rstrip("/"),
-            public_key=pk,
-            secret_key=sk,
+            name=base.name,
+            host=(host_override or base.host or "https://cloud.langfuse.com").rstrip("/"),
+            public_key=pk_override or base.public_key,
+            secret_key=sk_override or base.secret_key,
+            source=base.source,
+        )
+
+    @staticmethod
+    def _from_vars(values: Any, source: str) -> ProfileConfig:
+        return ProfileConfig(
+            name="",
+            host=values.get("LANGFUSE_BASE_URL") or values.get("LANGFUSE_HOST") or "",
+            public_key=values.get("LANGFUSE_PUBLIC_KEY", ""),
+            secret_key=values.get("LANGFUSE_SECRET_KEY", ""),
+            source=source,
         )
 
     @staticmethod
     def _parse_dotenv(path: str) -> Dict[str, str]:
-        res = {}
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    k, v = line.split("=", 1)
-                    k = k.strip()
-                    v = v.strip().strip("'\"")
-                    res[k] = v
-        except Exception:
-            pass
+            lines = Path(path).read_text(encoding="utf-8").splitlines()
+        except OSError as e:
+            raise ConfigError(f"cannot read env file {path}: {e}") from e
+        res = {}
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            res[k.strip()] = v.strip().strip("'\"")
         return res
+
+
+def resolve_from_args(args: argparse.Namespace) -> ProfileConfig:
+    """Credentials for one command, from its parsed common options."""
+    return ConfigManager().resolve_profile(args.profile, args.host, args.public_key, args.secret_key, args.env_file)
