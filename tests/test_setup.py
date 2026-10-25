@@ -59,6 +59,7 @@ def test_setup_yes_never_prompts_and_installs_the_pinned_skill(fake_api, monkeyp
     cmd, kwargs = npx.calls[0]
     assert code == 1  # doctor: no keys
     assert cmd == ["/usr/bin/npx", "--yes", "skills@1", "add", SKILL_SOURCE, "-g", "-y"]
+    assert f"Running: npx --yes skills@1 add {SKILL_SOURCE} -g -y" in out
     assert SKILL_SOURCE.endswith(f"/tree/v{__version__}/skills/langfuse-agent-cli")
     assert "lf auth login" in out
     assert not [name for name in kwargs["env"] if name.startswith("LANGFUSE_")]

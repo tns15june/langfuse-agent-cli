@@ -46,7 +46,7 @@ def _install_skill(interactive: bool) -> None:
     # Without -y the skills CLI asks which agents to install for; with -y it picks the detected ones.
     cmd = [npx, "--yes", "skills@1", "add", SKILL_SOURCE, "-g"] + ([] if interactive else ["-y"])
     env = {k: v for k, v in os.environ.items() if not k.startswith("LANGFUSE_")}  # keys stay out of npm packages
-    print(f"  Running: {' '.join(cmd[1:])}")
+    print(f"  Running: npx {' '.join(cmd[1:])}")
     sys.stdout.flush()
     try:
         failed = subprocess.run(cmd, env=env, timeout=None if interactive else 300).returncode != 0
