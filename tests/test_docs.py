@@ -43,3 +43,9 @@ def test_documented_commands_parse(source, argv):
     except SystemExit as exc:
         if exc.code not in (0, None):  # --version and --help exit 0 on purpose
             pytest.fail(f"{source}: documented command does not parse: {' '.join(argv)}")
+
+
+def test_hosted_agent_guide_matches_install_md():
+    """docs/AGENTS.md is the TWG-style URL agents are given; it must be the same text as INSTALL.md."""
+    hosted = (ROOT / "docs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert hosted == (ROOT / "INSTALL.md").read_text(encoding="utf-8")
