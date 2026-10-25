@@ -134,3 +134,48 @@ def test_doctor_fails_when_the_host_answers_with_a_web_page(fake_api, capsys, no
 
     assert code == 1
     assert "API Authorization: Valid" not in out
+
+
+FOLDER_PROMPT = "/api/public/v2/prompts/support%2Fgreeter"
+
+
+def test_prompt_get_compiles_vars(fake_api, capsys):
+    fake_api.route("GET", FOLDER_PROMPT, json=load_fixture("prompt_get_folder"))
+
+    _, out, _ = run(capsys, "prompt", "get", "support/greeter", "--vars", '{"user_name": "Ana", "question": "Why?"}')
+
+    assert [m["content"] for m in json.loads(out)["compiled_prompt"]] == ["You help Ana with their account.", "Why?"]
+
+
+@pytest.mark.parametrize("bad_vars", ["{bad", "[1, 2]"])
+def test_prompt_get_bad_vars_fails_before_any_request(fake_api, capsys, bad_vars):
+    code, out, err = run(capsys, "prompt", "get", "support/greeter", "--vars", bad_vars)
+
+    assert (code, out, fake_api.calls) == (1, "", [])
+    assert err.startswith("Error: --vars")
+
+
+@pytest.mark.parametrize("content,prompt_type,sent", [
+    ('[{"role": "user", "content": "Hi {{name}}"}]', "chat", [{"role": "user", "content": "Hi {{name}}"}]),
+    ("Hi {{name}}", "text", "Hi {{name}}"),
+    ('{"answer_format": "json"}', "text", '{"answer_format": "json"}'),  # a text prompt stays text
+])
+def test_prompt_push_from_file(fake_api, capsys, tmp_path, content, prompt_type, sent):
+    path = tmp_path / "prompt.txt"
+    path.write_text(content)
+    fake_api.route("POST", "/api/public/v2/prompts", json=load_fixture("prompt_create"), status=201)
+
+    code, _, _ = run(capsys, "prompt", "push", "p", "--file", str(path), "--type", prompt_type)
+
+    assert code == 0
+    assert fake_api.bodies[-1]["prompt"] == sent
+
+
+def test_prompt_push_chat_file_must_be_json(fake_api, capsys, tmp_path):
+    path = tmp_path / "chat.json"
+    path.write_text("Hi {{name}}")
+
+    code, out, err = run(capsys, "prompt", "push", "p", "--file", str(path), "--type", "chat")
+
+    assert (code, out, fake_api.calls) == (1, "", [])
+    assert err.startswith("Error: ")

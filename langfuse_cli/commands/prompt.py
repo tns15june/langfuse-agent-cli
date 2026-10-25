@@ -17,7 +17,8 @@ def compile_mustache(template: str, vars_dict: Dict[str, Any]) -> str:
     result = template
     for key, val in vars_dict.items():
         pattern = r"\{\{\s*" + re.escape(key) + r"\s*\}\}"
-        result = re.sub(pattern, str(val), result)
+        # A function replacement inserts the value as-is; a string one would expand \1, \n and \U in it.
+        result = re.sub(pattern, lambda _match, value=str(val): value, result)
     return result
 
 
@@ -59,14 +60,20 @@ def handle_prompt(args: argparse.Namespace) -> int:
         return 0
 
     if args.prompt_action == "get":
-        prompt = client.get_prompt(name=args.name, version=args.version, label=args.label)
+        vars_dict = None
         if args.vars:
             try:
                 vars_dict = json.loads(args.vars)
-                prompt["compiled_prompt"] = compile_prompt(prompt.get("prompt"), vars_dict)
-                prompt["applied_vars"] = vars_dict
-            except Exception as e:
-                print(f"Warning: Failed to parse --vars JSON: {e}", file=sys.stderr)
+            except ValueError as e:
+                print(f"Error: --vars is not valid JSON: {e}", file=sys.stderr)
+                return 1
+            if not isinstance(vars_dict, dict):
+                print('Error: --vars must be a JSON object, for example \'{"user_name": "Alice"}\'', file=sys.stderr)
+                return 1
+        prompt = client.get_prompt(name=args.name, version=args.version, label=args.label)
+        if vars_dict is not None:
+            prompt["compiled_prompt"] = compile_prompt(prompt.get("prompt"), vars_dict)
+            prompt["applied_vars"] = vars_dict
 
         if args.output == "json":
             print(format_agent_output(prompt, compact=compact, agent_fields=agent_fields))
@@ -89,10 +96,14 @@ def handle_prompt(args: argparse.Namespace) -> int:
     if args.file:
         with open(args.file, "r", encoding="utf-8") as f:
             content = f.read()
-        try:
-            prompt_content = json.loads(content)
-        except Exception:
-            prompt_content = content
+        if args.type == "chat":
+            try:
+                prompt_content = json.loads(content)
+            except ValueError as e:
+                print(f"Error: --file must hold a JSON list of messages for --type chat: {e}", file=sys.stderr)
+                return 1
+        else:
+            prompt_content = content  # a text prompt is sent as written, even when it looks like JSON
     elif args.text:
         prompt_content = args.text
     else:

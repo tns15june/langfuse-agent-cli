@@ -17,3 +17,9 @@ def test_compile_prompt_chat():
     compiled = compile_prompt(chat_prompt, vars_dict)
     assert compiled[0]["content"] == "You are assisting an analyst."
     assert compiled[1]["content"] == "Help me with a report."
+
+
+def test_compile_mustache_inserts_values_literally():
+    # Values are not regex replacement templates: backslashes (Windows paths, "\n", "\1") stay as given.
+    assert compile_mustache("Open {{path}}", {"path": "C:\\Users\\new"}) == "Open C:\\Users\\new"
+    assert compile_mustache("Open {{path}}", {"path": "a\\nb"}) == "Open a\\nb"
