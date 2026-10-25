@@ -7,17 +7,32 @@ import shutil
 import subprocess
 import sys
 
+from langfuse_cli import __version__, install_info
 from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.commands.auth import login
 from langfuse_cli.commands.doctor import SKILL_NAME, SKILL_SOURCE, handle_doctor
 from langfuse_cli.config import ConfigError, ConfigManager, resolve_from_args
 
 INSTALL_LATER = f"  To install it later: npx skills@1 add {SKILL_SOURCE} -g"
+TRY_IT = ("Why did my LLM app fail in the last hour?", "What did we spend on each model this week?",
+          "Which step of my agent is the slowest today?")
 SOURCE_NAMES = {"env": "the LANGFUSE_* environment variables", "env-file": "the --env-file file",
                 "flags": "--public-key and --secret-key"}
 
 
 def _credentials(args: argparse.Namespace, interactive: bool) -> None:
+    name = args.profile_name
+    if name and name not in ConfigManager().list_profiles():  # a new profile: nothing to check yet
+        if not interactive:
+            print(f"  – Login skipped: there is no profile '{name}' yet, and lf setup never asks for keys with --yes "
+                  f"or without a terminal. Ask the user to run 'lf setup --profile-name {name}' in their own terminal.")
+            return
+        host = input(f"  Langfuse host [{args.host or 'https://cloud.langfuse.com'}]: ").strip()
+        login(ConfigManager(), name, host or args.host or "https://cloud.langfuse.com", None, None, set_default=True)
+        args.profile = name  # doctor checks the profile just saved
+        return
+    if name:
+        args.profile = name
     try:
         prof = resolve_from_args(args)
     except ConfigError as e:  # doctor reports it again; the skill step still runs
@@ -47,22 +62,25 @@ def _credentials(args: argparse.Namespace, interactive: bool) -> None:
         login(ConfigManager(), prof.name, host, None, None, set_default=True)  # keys that failed are asked for again
 
 
-def _install_skill(interactive: bool) -> bool:
-    """Install the skill with the skills CLI; False when it could not be installed (declining is not a failure)."""
+def _install_skill(interactive: bool) -> str:
+    """Install the skill with the skills CLI: 'installed', 'current', 'declined' or 'failed'."""
+    if install_info.installed_skill_ref() == f"v{__version__}":
+        print(f"  ✓ Skill v{__version__} is already installed.")
+        return "current"
     npx = shutil.which("npx")
     if npx is None:
         print("  ✗ npx not found; the skills CLI needs Node.js 22.20 or later.")
         print(INSTALL_LATER)
-        return False
+        return "failed"
     # On Windows, which() searches the current folder first; never run an npx that a project folder supplies.
     if os.path.normcase(os.path.realpath(os.path.dirname(npx))) == os.path.normcase(os.path.realpath(os.getcwd())):
         print(f"  ✗ Not running {npx}: it is in the current folder. Run lf setup from another folder.")
         print(INSTALL_LATER)
-        return False
+        return "failed"
     if interactive and input(f"  Install the {SKILL_NAME} skill for your coding agents? [Y/n] ").strip().lower() in (
             "n", "no"):
         print(INSTALL_LATER)
-        return True
+        return "declined"
     # npx --yes skips npm's install prompt. The skills CLI's own -y skips its questions: without it, it asks which
     # agents to use when it finds several; with it, it takes the agents it finds, or every agent it supports when it
     # finds none. Run from inside a coding agent, it targets that agent either way.
@@ -83,7 +101,8 @@ def _install_skill(interactive: bool) -> bool:
     if reason:
         print(f"  ✗ The skill was not installed: {reason}")
         print(INSTALL_LATER)
-    return not reason
+        return "failed"
+    return "installed"
 
 
 def handle_setup(args: argparse.Namespace) -> int:
@@ -92,10 +111,14 @@ def handle_setup(args: argparse.Namespace) -> int:
     print("\n1. Credentials")
     _credentials(args, interactive)
     print("\n2. Agent Skill")
-    installed = _install_skill(interactive)
+    skill = _install_skill(interactive)
     print("\n3. Check")
     code = handle_doctor(args)
-    if not installed:
+    if skill == "failed":
         print("  ✗ lf setup did not install the skill (see step 2); any copy listed above is from an earlier install.")
         return 1
+    if code == 0 and skill in ("installed", "current"):
+        print("\nTry it: start a new session of your coding agent and ask, for example:")
+        for question in TRY_IT:
+            print(f'  "{question}"')
     return code

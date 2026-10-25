@@ -88,6 +88,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("doctor", parents=[common_parser], help="Check credentials, server and the agent skill")
     p_setup = subparsers.add_parser("setup", parents=[common_parser],
                                     help="Log in, install the agent skill and run doctor")
+    p_setup.add_argument("--profile-name", help="Profile to check, or to create when it does not exist yet")
     p_setup.add_argument("-y", "--yes", action="store_true",
                          help="Never prompt: skip login when no working credentials are found and install the skill "
                               "without asking")

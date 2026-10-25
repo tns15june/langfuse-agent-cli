@@ -6,7 +6,7 @@ import pytest
 import requests
 from helpers import route_doctor
 
-from langfuse_cli import __version__
+from langfuse_cli import __version__, install_info
 from langfuse_cli.cli import main
 from langfuse_cli.commands.doctor import SKILL_SOURCE
 from langfuse_cli.config import ConfigManager
@@ -294,3 +294,79 @@ def test_doctor_hint_points_to_setup(fake_api, capsys, no_skill_dirs):
 
     assert main(["doctor", *FLAGS]) == 0
     assert f"Run 'lf setup', or: npx skills@1 add {SKILL_SOURCE} -g" in capsys.readouterr().out
+
+
+def install_current_skill(ref=f"v{__version__}"):
+    skill = install_info.AGENTS_DIR / "skills" / "langfuse-agent-cli"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: langfuse-agent-cli\n---\n")
+    (install_info.AGENTS_DIR / ".skill-lock.json").write_text(
+        '{"skills": {"langfuse-agent-cli": {"ref": "%s"}}}' % ref)
+
+
+def test_setup_skips_the_skill_when_this_version_is_installed(fake_api, capsys, npx, no_prompts, no_skill_dirs):
+    install_current_skill()
+    route_doctor(fake_api)
+
+    assert main(["setup", "--yes", *FLAGS]) == 0
+
+    assert npx.calls == []
+    assert f"Skill v{__version__} is already installed" in sections(capsys.readouterr().out)[1]
+
+
+def test_setup_replaces_an_older_skill(fake_api, npx, no_prompts, no_skill_dirs):
+    install_current_skill("v0.2.0")
+    route_doctor(fake_api)
+
+    main(["setup", "--yes", *FLAGS])
+
+    assert npx.calls
+
+
+def test_setup_ends_with_plain_english_prompts_when_everything_works(fake_api, capsys, npx, no_prompts,
+                                                                     no_skill_dirs):
+    route_doctor(fake_api)
+
+    assert main(["setup", "--yes", *FLAGS]) == 0
+
+    check = sections(capsys.readouterr().out)[2]
+    assert "Try it" in check
+    assert '"Why did my LLM app fail in the last hour?"' in check
+
+
+def test_setup_shows_no_prompts_when_the_check_fails(fake_api, capsys, npx, no_prompts, no_skill_dirs):
+    route_doctor(fake_api, projects_status=401)
+
+    assert main(["setup", "--yes", *FLAGS]) == 1
+    assert "Try it" not in capsys.readouterr().out
+
+
+def test_setup_profile_name_creates_that_profile(fake_api, monkeypatch, capsys, npx, no_skill_dirs):
+    monkeypatch.setattr("sys.stdin", TTY())
+    answers = iter(["", "pk-lf-1", "n"])  # Enter keeps the --host value; public key; skip the skill
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "sk-lf-1")
+    route_doctor(fake_api)
+
+    assert main(["setup", "--profile-name", "staging", "--host", "http://lf.test"]) == 0
+
+    cfg = ConfigManager()
+    assert cfg.list_profiles()["staging"].host == "http://lf.test"
+    assert cfg.get_current_profile_name() == "staging"
+    assert "Source: profile (staging)" in capsys.readouterr().out
+
+
+def test_setup_profile_name_checks_an_existing_profile(fake_api, capsys, npx, no_prompts, no_skill_dirs):
+    cfg = ConfigManager()
+    cfg.save_profile("default", "http://other.test", "pk-x", "sk-x")
+    cfg.save_profile("work", "http://lf.test", "pk", "sk")
+    route_doctor(fake_api)
+
+    assert main(["setup", "--yes", "--profile-name", "work"]) == 0
+    assert "✓ Using profile credentials for http://lf.test" in capsys.readouterr().out
+
+
+def test_setup_profile_name_without_a_terminal_says_how_to_create_it(fake_api, capsys, npx, no_prompts,
+                                                                    no_skill_dirs):
+    assert main(["setup", "--yes", "--profile-name", "staging"]) == 1
+    assert "lf setup --profile-name staging" in sections(capsys.readouterr().out)[0]

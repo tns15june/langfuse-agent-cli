@@ -5,11 +5,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from langfuse_cli import __version__
+from langfuse_cli import __version__, install_info
 from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.config import ConfigManager, resolve_from_args
 
-SKILL_NAME = "langfuse-agent-cli"
+SKILL_NAME = install_info.SKILL_NAME
 # The skill as of this CLI's release tag, so an installed skill never documents flags the CLI lacks
 SKILL_SOURCE = f"https://github.com/tns15june/langfuse-agent-cli/tree/v{__version__}/skills/{SKILL_NAME}"
 KNOWN_SKILL_TARGETS = [
@@ -54,6 +54,12 @@ def handle_doctor(args: argparse.Namespace) -> int:
 
     print("\n1. Build & Runtime")
     print(f"  CLI Version: {__version__}")
+    print(f"  Installed at: {install_info.lf_location()} ({install_info.install_method()})")
+    latest = install_info.latest_version()
+    if latest and install_info.is_newer(latest):
+        print(f"  ℹ Version {latest} is available: run 'lf upgrade'")
+    elif latest:
+        print("  ✓ Latest version")
     print(f"  Python Version: {sys.version.split()[0]}")
     print(f"  Config File: {cfg.config_path} ({'exists' if cfg.config_path.exists() else 'not created yet'})")
 
@@ -63,7 +69,7 @@ def handle_doctor(args: argparse.Namespace) -> int:
     print(f"  Public Key: {prof.masked_public_key()}")
     print(f"  Secret Key: {prof.masked_secret_key()}")
     if not prof.is_complete():
-        print("  ✗ Incomplete credentials. Run 'lf auth login' or set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY.")
+        print("  ✗ Incomplete credentials. Run 'lf setup' or set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY.")
         auth_ok = False
     else:
         auth_ok = _check_server(LangfuseClient(prof))
@@ -78,6 +84,9 @@ def handle_doctor(args: argparse.Namespace) -> int:
             print(f"  ✓ {name:<18} Installed at {skill_path}")
         else:
             print(f"  – {name:<18} Not found in {target_dir}")
+    ref = install_info.installed_skill_ref()
+    if ref and ref != f"v{__version__}":
+        print(f"  ⚠ The installed skill is {ref}; run 'lf setup' to install v{__version__}")
 
     print("\nSummary:")
     if not auth_ok:

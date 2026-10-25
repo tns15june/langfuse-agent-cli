@@ -45,7 +45,7 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
     "setup": {
         "desc": "Log in, install the agent skill and run doctor",
         "write": True,
-        "opts": ["--yes", "--host <url>"],
+        "opts": ["--yes", "--host <url>", "--profile-name <name>"],
         "rules": [
             "Asks for the host and keys when a saved profile is missing or rejected, and before installing the "
             "skill, unless --yes is given or stdin is not a terminal; agents run it with --yes.",

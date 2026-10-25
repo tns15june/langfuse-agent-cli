@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 import pytest
 import requests
 
-from langfuse_cli import config
+from langfuse_cli import config, install_info
 from langfuse_cli.commands import doctor
 
 
@@ -15,6 +15,8 @@ def isolated_config(tmp_path, monkeypatch):
     """Keep every test away from the real profiles file, ./.env, LANGFUSE_* variables and the temp directory."""
     monkeypatch.setattr(config, "DEFAULT_PROFILES_FILE", tmp_path / "profiles.json")
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))  # --output-summary files
+    monkeypatch.setattr(install_info, "AGENTS_DIR", tmp_path / "home" / ".agents")  # skills installed by lf setup
+    monkeypatch.setenv("LF_NO_UPDATE_CHECK", "1")  # doctor's PyPI check; tests that need it unset this
     monkeypatch.chdir(tmp_path)
     for name in [n for n in os.environ if n.startswith("LANGFUSE_")]:
         monkeypatch.delenv(name)
@@ -35,6 +37,7 @@ class FakeAPI:
     def __call__(self, method, url, params=None, json=None, **kwargs):
         # Installed as a class attribute on requests.Session; an instance is not bound, so no session arg.
         path = urlsplit(url).path
+        method = method.upper()  # requests.get() passes "get"; requests upper-cases it later, so do the same
         self.calls.append((method, path, {k: [str(i) for i in v] if isinstance(v, list) else str(v)
                                           for k, v in (params or {}).items()}))
         self.bodies.append(json)
