@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from helpers import load_fixture
 
 from langfuse_cli.cli import main
@@ -31,10 +32,11 @@ def test_trace_list_reads_root_observations(fake_api, capsys):
     assert fake_api.calls[-1][2] == {"isRootObservation": "true", "fields": "core,basic,metrics", "limit": "5"}
 
 
-def test_trace_list_maps_filters_to_v2_names(fake_api, capsys):
+@pytest.mark.parametrize("status", [[], ["--status", "error"]])
+def test_trace_list_maps_filters_to_v2_names(fake_api, capsys, status):
     fake_api.route("GET", OBS, json=load_fixture("obs_roots"))
 
-    run(capsys, "trace", "list", "--session-id", "s1", "--user-id", "u1",
+    run(capsys, "trace", "list", *status, "--session-id", "s1", "--user-id", "u1",
         "--from-ts", "2026-10-24T00:00:00Z", "--to-ts", "2026-10-25T00:00:00Z")
 
     params = fake_api.calls[-1][2]
@@ -120,3 +122,27 @@ def test_trace_session_sorted_oldest_first(fake_api, capsys):
         "2026-10-24T21:46:02.166Z", "2026-10-24T21:46:02.168Z", "2026-10-24T21:46:02.170Z", "2026-10-24T21:46:02.172Z"]
     params = fake_api.calls[-1][2]
     assert (params["sessionId"], params["isRootObservation"]) == ("sess-a", "true")
+
+
+def test_trace_get_reads_every_page_and_sorts_across_them(fake_api, capsys):
+    rows = load_fixture("obs_trace")["data"]  # API order: plan-step, search_tool_call, then the root
+    fake_api.route("GET", OBS, json={"data": rows[:2], "meta": {"cursor": "c2"}})
+    fake_api.route("GET", OBS, json={"data": rows[2:], "meta": {}})
+
+    code, out, _ = run(capsys, "trace", "get", ERROR_TRACES[0])
+
+    assert code == 0
+    assert [o["name"] for o in json.loads(out)] == ["support-agent-turn", "plan-step", "search_tool_call"]
+    assert [call[2].get("cursor") for call in fake_api.calls] == [None, "c2"]
+
+
+@pytest.mark.parametrize("limit,requests_made", [(1, 1), (3, 2)])
+def test_status_error_pages_only_as_far_as_the_limit(fake_api, capsys, limit, requests_made):
+    errors = load_fixture("obs_errors")["data"]  # one ERROR row per trace
+    fake_api.route("GET", OBS, json={"data": errors[:2], "meta": {"cursor": "c2"}})
+    fake_api.route("GET", OBS, json={"data": errors[2:], "meta": {}})
+
+    _, out, _ = run(capsys, "trace", "list", "--status", "error", "--limit", str(limit))
+
+    assert [g["traceId"] for g in json.loads(out)] == ERROR_TRACES[:limit]
+    assert len(fake_api.calls) == requests_made  # with --limit 1 the second page is never requested

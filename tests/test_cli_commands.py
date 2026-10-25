@@ -5,6 +5,7 @@ from helpers import load_fixture
 
 from langfuse_cli.cli import main
 from langfuse_cli.commands import doctor
+from langfuse_cli.config import ConfigManager
 
 FLAGS = ["--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]
 OBS = "/api/public/v2/observations"
@@ -114,7 +115,9 @@ def test_doctor_old_server_without_v2_observations(fake_api, capsys, no_skill_di
     code, out, _ = run(capsys, "doctor")
 
     assert code == 1
-    assert "/api/public/v2/observations" in out
+    assert "API Authorization: Valid" in out  # the keys are fine; the server is too old
+    assert "trace commands need Langfuse v4" in out
+    assert "Observations API v2: HTTP 404" not in out  # the generic branch names the same path
 
 
 def test_auth_status_rejects_bad_keys(fake_api, capsys):
@@ -190,3 +193,16 @@ def test_doctor_finds_a_project_level_skill(fake_api, capsys, no_skill_dirs, tmp
 
     assert code == 0
     assert "All checks passed." in out
+
+
+SECRET = "sk-lf-0123456789abcdef"
+
+
+def test_status_commands_never_print_the_secret_key(fake_api, capsys, no_skill_dirs):
+    route_doctor(fake_api)
+    ConfigManager().save_profile("default", "http://lf.test", "pk-lf-0123456789", SECRET)
+
+    for argv in (["doctor"], ["auth", "status"], ["auth", "list"]):
+        assert main(argv) == 0, argv
+        captured = capsys.readouterr()
+        assert SECRET[6:-4] not in captured.out + captured.err, argv  # the part the mask never shows

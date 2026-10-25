@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import requests
 from helpers import load_fixture
@@ -92,3 +94,36 @@ def test_auth_switch_unknown_profile_reports_on_stderr(capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "nope" in captured.err
+
+
+@pytest.fixture
+def two_profiles(fake_api):
+    cfg = ConfigManager()  # the isolated profiles file from conftest
+    cfg.save_profile("default", "http://default.test", "pk-lf-default-1111", "sk-lf-default-1111", set_default=True)
+    cfg.save_profile("prod", "http://prod.test", "pk-lf-prod-2222", "sk-lf-prod-2222")
+    Path("creds.env").write_text(  # the cwd is tmp_path (conftest)
+        "LANGFUSE_PUBLIC_KEY=pk-lf-file-3333\nLANGFUSE_SECRET_KEY=sk-lf-file-3333\nLANGFUSE_HOST=http://file.test\n")
+    fake_api.route("GET", "/api/public/projects", json=load_fixture("projects"))
+
+
+@pytest.mark.parametrize("argv,env,host,key_end", [
+    (["auth", "status"], {}, "http://default.test", "1111"),  # the saved current profile
+    (["auth", "status", "--profile", "prod"], {}, "http://prod.test", "2222"),
+    (["--profile", "prod", "auth", "status"], {}, "http://prod.test", "2222"),  # option before the subcommand
+    (["auth", "status"], {"LANGFUSE_PROFILE": "prod"}, "http://prod.test", "2222"),
+    (["auth", "status", "--profile", "prod", "--env-file", "creds.env"], {}, "http://file.test", "3333"),
+])
+def test_credential_source_reaches_the_command(two_profiles, monkeypatch, capsys, argv, env, host, key_end):
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+
+    assert main(argv) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert f"Host: {host}" in lines
+    assert f"Public Key: pk-lf-...{key_end}" in lines  # host and keys come from the same source
+
+
+def test_unknown_profile_is_a_one_line_error(capsys):
+    assert main(["trace", "list", "--profile", "nope"]) == 1
+    captured = capsys.readouterr()
+    assert (captured.out, captured.err) == ("", "Error: profile 'nope' not found; see 'lf auth list'\n")
