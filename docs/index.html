@@ -83,7 +83,7 @@ section { display: grid; gap: 28px; }
 .lede code { font-size: 0.92em; background: color-mix(in srgb, var(--rule) 55%, transparent); padding: 0.06em 0.34em; border-radius: 4px; }
 .box { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; display: grid; min-width: 0; }
 .box-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
-.box pre { margin: 0; padding: 14px 16px; font-size: 0.95rem; line-height: 1.7; overflow-x: auto; }
+.box pre { margin: 0; padding: 14px 16px; font-size: 0.95rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .box .prompt { color: var(--muted); user-select: none; }
 .box .say { margin: 0; padding: 14px 16px; font-size: 0.98rem; overflow-wrap: anywhere; }
 .note { color: var(--muted); font-size: 0.92rem; margin: 0; }
@@ -139,12 +139,14 @@ section { display: grid; gap: 28px; }
 
 .agent { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .agent ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--muted); }
+.asks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.asks li { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px 14px 14px 4px; padding: 14px 16px; font-size: 1.02rem; }
 
 footer { display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 24px; color: var(--muted); font-size: 0.9rem; }
 footer p { margin: 0; max-width: 90ch; }
 
 @media (max-width: 900px) {
-  .hero, .agent { grid-template-columns: minmax(0, 1fr); }
+  .hero, .agent, .asks { grid-template-columns: minmax(0, 1fr); }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flow { grid-template-columns: minmax(0, 1fr); }
   .node, .node + .node { padding: 14px 0 14px 18px; border-left: 2px solid var(--rule); }
@@ -163,13 +165,12 @@ footer p { margin: 0; max-width: 90ch; }
     <div class="hero-copy">
       <div class="eyebrow">langfuse-agent-cli · MIT · Python 3.10+</div>
       <h1>Langfuse traces, sized for coding agents</h1>
-      <p class="lede"><code>lf</code> is a command-line tool and an agent skill. A coding agent asks for the failing traces and gets their error messages in one call, sees a trace as a tree, and receives large results as a file plus a short summary.</p>
+      <p class="lede">Ask your coding agent about your LLM app in plain English. It answers from your Langfuse data with <code>lf</code>, a command-line tool and agent skill: failing traces with their error messages, a trace as a tree, conversations, cost, latency, prompts and scores.</p>
       <div class="box">
-        <div class="box-top"><span class="eyebrow">Install</span><button class="copy" type="button" data-copy="install-cmds">Copy</button></div>
-        <pre><span class="prompt">$ </span><span id="install-cmds">pipx install langfuse-agent-cli
-lf setup</span></pre>
+        <div class="box-top"><span class="eyebrow">Install on macOS or Linux</span><button class="copy" type="button" data-copy="install-cmds">Copy</button></div>
+        <pre><span class="prompt">$ </span><span id="install-cmds">curl -fsSL https://tns15june.github.io/langfuse-agent-cli/install.sh | sh</span></pre>
       </div>
-      <p class="note"><code>lf setup</code> keeps working keys or asks for them, installs the skill for your coding agents, and runs <code>lf doctor</code>. Works with Langfuse v4, self-hosted or Cloud.</p>
+      <p class="note">It installs <code>lf</code> with uv or pipx and runs <code>lf setup</code>: your Langfuse keys, the agent skill, and a check. To install it yourself: <code>uv tool install langfuse-agent-cli</code>, then <code>lf setup</code>. Works with Langfuse v4, self-hosted or Cloud.</p>
       <nav class="links" aria-label="Project links">
         <a href="https://github.com/tns15june/langfuse-agent-cli">GitHub</a>
         <a href="https://pypi.org/project/langfuse-agent-cli/">PyPI</a>
@@ -198,6 +199,23 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
 }</pre>
     </div>
   </header>
+
+  <section aria-labelledby="try">
+    <div class="section-head">
+      <span class="eyebrow">Try it</span>
+      <h2 id="try">Ask in plain English</h2>
+      <p>Start a new session of your coding agent and ask, for example:</p>
+    </div>
+    <ul class="asks">
+      <li>“Why did my LLM app fail in the last hour?”</li>
+      <li>“Which tool fails most often this week, and since when?”</li>
+      <li>“What did we spend on each model this week?”</li>
+      <li>“Which step of my agent is the slowest?”</li>
+      <li>“Walk me through the conversation in session sess-42.”</li>
+      <li>“Which version of the welcome-bot prompt is live, and how does it read for Alice?”</li>
+    </ul>
+    <p class="note">More questions, with the commands your agent runs for them: <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/skills/langfuse-agent-cli/references/EXAMPLES.md">agent examples</a>.</p>
+  </section>
 
   <section aria-labelledby="measured">
     <div class="section-head">
@@ -255,7 +273,7 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
       <div class="node">
         <span class="eyebrow">CLI</span>
         <h3><code>lf</code></h3>
-        <p>Reads <code>/api/public/v2/observations</code>, the trace read path on Langfuse v4, plus prompts, datasets and scores.</p>
+        <p>Reads traces from <code>/api/public/v2/observations</code>, totals for cost, latency and errors from <code>/api/public/v2/metrics</code>, plus prompts, datasets and scores.</p>
         <span class="arrow" aria-hidden="true">→</span>
       </div>
       <div class="node">
@@ -274,12 +292,13 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
     <div class="agent">
       <div class="box">
         <div class="box-top"><span class="eyebrow">Prompt</span><button class="copy" type="button" data-copy="agent-prompt">Copy</button></div>
-        <p class="say" id="agent-prompt">Install langfuse-agent-cli by following https://raw.githubusercontent.com/tns15june/langfuse-agent-cli/main/INSTALL.md</p>
+        <p class="say" id="agent-prompt">Install langfuse-agent-cli using https://tns15june.github.io/langfuse-agent-cli/AGENTS.md</p>
       </div>
       <ol>
-        <li>The agent installs <code>lf</code> from PyPI with uv or pipx.</li>
+        <li>The agent finds or installs <code>lf</code>, with the one-line installer or with uv or pipx.</li>
         <li>It runs <code>lf setup --yes</code>, which installs the skill for that agent and never prompts.</li>
         <li>If no keys are configured, it asks you to run <code>lf setup</code> in your own terminal. It never asks for keys in chat.</li>
+        <li>It reports what <code>lf doctor</code> found and suggests a first question to try.</li>
       </ol>
     </div>
   </section>
@@ -290,14 +309,14 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
       <h2 id="verified">Tested the way people will use it</h2>
     </div>
     <div class="stats">
-      <div class="stat"><b>219</b><span>unit tests, on Python 3.10, 3.11, 3.12 and 3.13 in CI</span></div>
-      <div class="stat"><b>11 / 11</b><span>live tests against the newest Langfuse release in CI, and 4.70 locally</span></div>
-      <div class="stat"><b>26 / 26</b><span>command checks with the build downloaded from PyPI</span></div>
-      <div class="stat"><b>25 s</b><span>for a fresh Claude Code session to find the failures and name the cause</span></div>
+      <div class="stat"><b>10 / 10</b><span>plain-English questions answered correctly by fresh Claude Code sessions with only the skill</span></div>
+      <div class="stat"><b>352</b><span>unit tests, on Python 3.10, 3.11, 3.12 and 3.13 in CI</span></div>
+      <div class="stat"><b>13 / 13</b><span>live tests against the newest Langfuse release in CI, and 4.70 locally</span></div>
+      <div class="stat"><b>4.30–4.70</b><span>Langfuse versions it has run against, metrics included</span></div>
     </div>
     <ul class="checks">
-      <li><span>A clean <code>uv tool install langfuse-agent-cli</code> followed by <code>lf setup --yes</code> installed the skill from the release tag, and <code>lf doctor</code> passed.</span></li>
-      <li><span>The agent session had only the skill installed. It picked the skill on its own, ran three <code>lf</code> commands, used <code>--output-summary</code> without being told, and traced the failures to a search tool returning 503s.</span></li>
+      <li><span>Each agent session had only the skill installed. It picked the skill on its own, chose the commands, and its answer matched the data: the failing tool and its errors, spend by model, tokens per day, a conversation, one user's day, the live prompt version and the scores.</span></li>
+      <li><span>The one-line installer ran end to end in a clean home folder: it installed <code>lf</code> with uv, then the skill, and <code>lf doctor</code> passed.</span></li>
       <li><span>CI runs weekly against the newest Langfuse release, so API changes show up before users report them.</span></li>
     </ul>
   </section>
@@ -307,7 +326,8 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
     <nav class="links" aria-label="More links">
       <a href="https://github.com/tns15june/langfuse-agent-cli">GitHub</a>
       <a href="https://pypi.org/project/langfuse-agent-cli/">PyPI</a>
-      <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/INSTALL.md">INSTALL.md</a>
+      <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/skills/langfuse-agent-cli/references/EXAMPLES.md">Agent examples</a>
+      <a href="https://tns15june.github.io/langfuse-agent-cli/AGENTS.md">Agent install guide</a>
       <a href="https://github.com/tns15june/langfuse-agent-cli/blob/main/RFC.md">RFC</a>
       <a href="https://github.com/tns15june/langfuse-agent-cli/issues">Issues</a>
     </nav>
