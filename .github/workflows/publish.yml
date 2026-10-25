@@ -1,0 +1,53 @@
+name: Publish
+
+# Pushing a tag v<version> publishes that version to PyPI through trusted publishing (no stored token).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check that the tag matches the package version
+        run: |
+          version=$(python -c "import langfuse_cli; print(langfuse_cli.__version__)")
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - name: Build and check the distributions
+        run: |
+          pip install build twine
+          python -m build
+          twine check --strict dist/*
+      - name: Install the wheel in a clean environment
+        run: |
+          python -m venv /tmp/wheel-test
+          /tmp/wheel-test/bin/pip install dist/*.whl
+          [ "$(/tmp/wheel-test/bin/lf --version)" = "lf ${GITHUB_REF_NAME#v}" ]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/langfuse-agent-cli
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
