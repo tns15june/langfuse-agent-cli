@@ -49,5 +49,6 @@ def format_agent_output(
         elif isinstance(data, dict):
             data = filter_dict_fields(data, fields)
     if compact:
-        data = prune(data)
+        # Prune inside each row but keep the rows: dropping emptied rows would print [] for real results.
+        data = [prune(row) for row in data] if isinstance(data, list) else prune(data)
     return json.dumps(data, indent=2, ensure_ascii=False)

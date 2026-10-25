@@ -33,6 +33,14 @@ def test_agent_fields_apply_per_list_item():
     ]
 
 
+def test_compact_projection_keeps_one_entry_per_row():
+    rows = load_fixture("obs_trace")["data"]
+
+    out = json.loads(format_agent_output(rows, compact=True, agent_fields="nonexistent"))
+
+    assert out == [{}, {}, {}]  # [] would read as "no rows" to an agent
+
+
 def test_agent_fields_traverse_lists():
     data = {"obs": [{"name": "x"}, {"name": "y"}]}
 

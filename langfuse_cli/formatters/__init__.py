@@ -10,4 +10,5 @@ def clean(text: str) -> str:
     Trace names, inputs and error messages come from end users of the traced app; printed raw,
     an escape sequence in them could rewrite the terminal.
     """
-    return _CONTROL_CHARS.sub(lambda m: f"\\x{ord(m.group()):02x}", text)
+    # \uXXXX rather than \xXX: it is also a valid JSON escape, so JSON output stays parseable and lossless.
+    return _CONTROL_CHARS.sub(lambda m: f"\\u{ord(m.group()):04x}", text)
