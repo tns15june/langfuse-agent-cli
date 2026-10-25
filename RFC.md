@@ -55,10 +55,12 @@ the payload as today. See Prior art.
 
 **Prototype.** `--output-summary` in `langfuse_cli/formatters/agent.py`, with a 16 KB threshold,
 measured after field projection and pruning. The file goes to the system temp directory, readable
-only by the user. The envelope starts with `"summary": true`, so a caller can tell it from a payload
-that is itself an object; on the 24.3 KB listing in the table above it is 0.7 KB. The prototype's
-commands follow cursors themselves, so its envelope has no cursor. The generated CLI returns one page
-unless given `--all`, so its envelope would carry `meta.cursor`.
+only by the user. The envelope has `"summary": true` and `outputFile`, so a caller can tell it from a
+payload that is itself an object; on the 24.3 KB listing in the table above it is 0.7 KB. It has no
+cursor: the prototype's trace commands follow cursors themselves, and its other commands return one
+bounded page. The generated CLI returns one page unless given `--all`; for a `{data, meta}` page,
+`rows` and `rowKeys` would describe `data`, and the envelope would carry `meta` as returned (a cursor
+on the v2 observations API, page numbers on prompts and datasets).
 
 ### 2. Field projection and pruning
 
@@ -116,8 +118,9 @@ A separate, small pull request adds field-selection and `--level ERROR` tips to
 
 ## Prior art
 
-The command map (`help-map`), the `--agent-fields` option and the summary envelope
-(`--output-summary`) come from Atlassian's
+The command map (`help-map`), field projection and the summary envelope (`--output-summary`) come
+from Atlassian's
 [Teamwork Graph CLI](https://developer.atlassian.com/platform/teamwork-graph/twg-cli/getting-started/installation/).
-Its envelope is YAML and has several levels (`none`, `stats`, `auto`, `inline`); the prototype's is
-JSON and has only the automatic behaviour.
+There, projection is `--select`, and `--agent-fields` picks the fields of the summary envelope; the
+prototype uses `--agent-fields` for projection. TWG's envelope is YAML and has several levels
+(`none`, `stats`, `auto`, `inline`); the prototype's is JSON and has only the automatic behaviour.

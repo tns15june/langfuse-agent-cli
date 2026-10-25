@@ -5,8 +5,8 @@
 - JSON (default for data commands): exactly one JSON document on stdout, safe to pipe into `jq`.
   `doctor`, `setup`, `auth`, `help-map` and `trace get --timeline` print text.
 - Text (`-o text`): short lines for people. `lf trace get <trace-id> -o text` prints the timeline.
-- Errors go to stderr and the exit code is non-zero; `doctor`, `setup` and `auth status` print their
-  report, failures included, on stdout.
+- Errors go to stderr and the exit code is non-zero; `doctor`, `lf setup --yes` and `auth status`
+  print their report, failures included, on stdout.
 
 Terminal control characters found in server data (trace names, inputs, error messages) are
 printed escaped, as `\u001b` and so on; inside JSON that is an ordinary escape, so values are unchanged.
@@ -41,7 +41,8 @@ fields); the list commands request `core,basic,metrics`. `metrics` adds a few by
 With `--output-summary`, JSON output larger than 16 KB, measured after `--agent-fields` and
 `--compact`, is written to a new file in the system temp directory, readable only by you. The command
 prints a summary instead. This one came from `lf trace list --limit 100 --output-summary` on a
-synthetic project (24,322 bytes of JSON, 36 rows), with the path and the key list shortened:
+synthetic project (24,322 bytes of JSON, 36 rows), with the key list shortened and the temp path
+replaced:
 
 ```json
 {
@@ -56,9 +57,10 @@ synthetic project (24,322 bytes of JSON, 36 rows), with the path and the key lis
 
 A list gives `rows` and `rowKeys`, the keys found in its rows; an object, such as the result of
 `dataset get`, gives `keys`. Output of 16 KB or less is printed as usual, so check for
-`"summary": true` before you use the result. Read the file with `jq`, for example
-`jq '.[] | select(.level == "ERROR") | {traceId, statusMessage}' /tmp/lf-y7qgu_0r.json`. Text output
-is never summarized, and `lf` does not delete the files.
+`"summary": true` before you use the result; in a script, `jq -r '.outputFile? // empty'` prints the
+file path for a summary and nothing otherwise (`.summary` fails on a list). Read the file with `jq`,
+for example `jq '.[] | select(.level == "ERROR") | {traceId, statusMessage}' /tmp/lf-y7qgu_0r.json`.
+Text output is never summarized, and `lf` does not delete the files.
 
 ## Failing traces
 

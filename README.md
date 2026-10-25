@@ -27,8 +27,11 @@ lf setup
 
 `lf setup` takes three steps and is safe to run again:
 
-1. **Credentials.** It keeps working credentials that it finds. Otherwise it asks for the host and
-   the keys (the secret is not echoed) and saves them as a profile.
+1. **Credentials.** It keeps working credentials that it finds. When no profile is saved, or the
+   saved profile's keys are rejected, it asks for the host and the keys (the secret is not echoed)
+   and saves them. It never replaces saved keys when the server is merely unreachable, and keys from
+   `LANGFUSE_*` variables, `--env-file` or key flags, which take precedence over profiles, are left for
+   you to fix.
 2. **Agent skill.** It installs the `langfuse-agent-cli` skill with the
    [skills CLI](https://github.com/vercel-labs/skills), which asks which coding agents to install it
    for when it finds more than one. The skill comes from the release tag that matches your `lf`
@@ -41,8 +44,9 @@ To have a coding agent install it, give the agent this prompt:
 Install langfuse-agent-cli by following https://raw.githubusercontent.com/tns15june/langfuse-agent-cli/main/INSTALL.md
 ```
 
-The agent installs the CLI and runs `lf setup --yes`, which never prompts. If no credentials are
-configured, it asks you to run `lf auth login` yourself.
+The agent installs the CLI and runs `lf setup --yes`, which never prompts and installs the skill for
+that agent. If no working credentials are configured, the agent asks you to run `lf setup` yourself,
+which asks for the host and the keys.
 
 To install the latest code from GitHub instead of PyPI:
 `pipx install git+https://github.com/tns15june/langfuse-agent-cli`.
@@ -55,7 +59,8 @@ npx skills remove --global langfuse-agent-cli
 pipx uninstall langfuse-agent-cli
 ```
 
-Saved profiles stay in `~/.config/langfuse/profiles.json` until you delete that file.
+With uv, use `uv tool upgrade langfuse-agent-cli` and `uv tool uninstall langfuse-agent-cli`. Saved
+profiles stay in `~/.config/langfuse/profiles.json` until you delete that file.
 
 ## Credentials
 
@@ -136,8 +141,8 @@ Observations with a measured duration show it in brackets, such as `[1.24s]`. La
 no duration for observations of zero length, like these synthetic ones.
 
 Exit codes: `0` success, `1` API or configuration error, `2` invalid command. The reason for a failure is
-on stderr, except that `doctor`, `setup` and `auth status` print their whole report, failures included,
-on stdout.
+on stderr, except that `doctor`, `setup --yes` and `auth status` print their whole report, failures
+included, on stdout. `setup` also exits `1` when the skill was not installed.
 
 ## API endpoints used
 
@@ -178,22 +183,24 @@ on every push and weekly.
 
 ### Releasing
 
-The Publish workflow uploads to PyPI with trusted publishing, so no token is stored. Bump
-`__version__` in `langfuse_cli/__init__.py`, push to `main`, then tag that commit:
+The Publish workflow uploads to PyPI with trusted publishing, so no token is stored; the PyPI project
+lists `publish.yml` and the GitHub environment `pypi` as its trusted publisher. Bump `__version__` in
+`langfuse_cli/__init__.py`, commit, then push that commit and its tag together:
 
 ```bash
-git tag v0.3.0 && git push origin v0.3.0
+git tag v0.3.0 && git push --atomic origin main v0.3.0
 ```
 
 The workflow checks that the tag matches the version, runs the tests, builds and checks the
-distributions, installs the wheel, and uploads it. Tag right after the version bump, because
-`lf setup` installs the skill from the tag that matches the version.
+distributions, installs the wheel, and uploads the wheel and the source archive. `main` should never
+carry a version without its tag, because `lf setup` and `lf doctor` point at the skill under that tag.
 
 ## Prior art
 
-The command map (`lf help-map`), the `--agent-fields` and `--output-summary` options, `lf setup` and
-the agent install prompt follow Atlassian's
-[Teamwork Graph CLI](https://developer.atlassian.com/platform/teamwork-graph/twg-cli/getting-started/installation/).
+The command map (`lf help-map`), the `--output-summary` option, `lf setup` and the agent install prompt
+follow Atlassian's
+[Teamwork Graph CLI](https://developer.atlassian.com/platform/teamwork-graph/twg-cli/getting-started/installation/),
+whose `--select` option does what `lf`'s `--agent-fields` does.
 
 ## License
 
