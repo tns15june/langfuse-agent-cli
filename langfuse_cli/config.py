@@ -153,7 +153,7 @@ class ConfigManager:
             host=(host_override or base.host or "https://cloud.langfuse.com").rstrip("/"),
             public_key=pk_override or base.public_key,
             secret_key=sk_override or base.secret_key,
-            source=base.source,
+            source="flags" if pk_override and sk_override else base.source,
         )
 
     @staticmethod

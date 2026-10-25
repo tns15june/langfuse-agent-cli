@@ -1,0 +1,125 @@
+import json
+
+import pytest
+from helpers import load_fixture
+
+from langfuse_cli.cli import main
+from langfuse_cli.commands import doctor
+
+FLAGS = ["--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]
+OBS = "/api/public/v2/observations"
+
+
+def run(capsys, *argv):
+    code = main([*argv, *FLAGS])
+    captured = capsys.readouterr()
+    return code, captured.out, captured.err
+
+
+def test_prompt_list_text_shows_latest_version(fake_api, capsys):
+    fake_api.route("GET", "/api/public/v2/prompts", json=load_fixture("prompts_list"))
+
+    _, out, _ = run(capsys, "prompt", "list", "-o", "text")
+
+    assert "  - support/greeter (v1) [labels: latest, production, staging] - type: chat" in out.splitlines()
+    assert "  - welcome-bot (v2) [labels: latest, production, staging] - type: text" in out.splitlines()
+
+
+def test_prompt_push_json_stdout_is_one_document(fake_api, capsys):
+    fake_api.route("POST", "/api/public/v2/prompts", json=load_fixture("prompt_create"), status=201)
+
+    code, out, _ = run(capsys, "prompt", "push", "greeter-test", "--text", "Hi {{user_name}}", "--labels", "staging")
+
+    assert code == 0
+    assert json.loads(out)["version"] == 1
+    assert fake_api.bodies[-1] == {"name": "greeter-test", "type": "text", "prompt": "Hi {{user_name}}", "labels": ["staging"]}
+
+
+def test_score_create_json_stdout_is_one_document(fake_api, capsys):
+    fake_api.route("POST", "/api/public/scores", json=load_fixture("score_create"))
+
+    code, out, _ = run(capsys, "score", "create", "--trace-id", "t1", "--name", "accuracy", "--value", "1")
+
+    assert code == 0
+    assert json.loads(out) == {"id": "9fcdf61e-ef47-4193-aa21-ce4054c7eca6"}
+    assert fake_api.bodies[-1] == {"traceId": "t1", "name": "accuracy", "value": 1.0}
+
+
+def test_dataset_list_reads_v2(fake_api, capsys):
+    fake_api.route("GET", "/api/public/v2/datasets", json=load_fixture("datasets_list"))
+
+    _, out, _ = run(capsys, "dataset", "list")
+
+    assert [d["name"] for d in json.loads(out)] == ["intent-classification-evals"]
+
+
+def test_dataset_get_merges_items(fake_api, capsys):
+    fake_api.route("GET", "/api/public/v2/datasets/intent-classification-evals", json=load_fixture("dataset_get"))
+    fake_api.route("GET", "/api/public/dataset-items", json=load_fixture("dataset_items"))
+
+    code, out, _ = run(capsys, "dataset", "get", "intent-classification-evals")
+
+    data = json.loads(out)
+    assert code == 0
+    assert data["name"] == "intent-classification-evals"
+    assert sorted(i["expectedOutput"]["intent"] for i in data["items"]) == ["account", "billing", "bug"]
+    assert fake_api.calls[-1][2]["datasetName"] == "intent-classification-evals"
+
+
+def test_dataset_run_is_gone():
+    with pytest.raises(SystemExit) as exc:
+        main(["dataset", "run", "--dataset", "d", "--run-name", "r"])
+    assert exc.value.code == 2
+
+
+@pytest.fixture
+def no_skill_dirs(monkeypatch, tmp_path):
+    monkeypatch.setattr(doctor, "KNOWN_SKILL_TARGETS", [("Claude Code", tmp_path / "skills")])
+
+
+def route_doctor(fake_api, projects_status=200, observations_status=200):
+    fake_api.route("GET", "/api/public/health", json=load_fixture("health"))
+    projects = load_fixture("projects") if projects_status == 200 else {"message": "Invalid credentials"}
+    fake_api.route("GET", "/api/public/projects", json=projects, status=projects_status)
+    observations = load_fixture("obs_empty") if observations_status == 200 else None
+    fake_api.route("GET", OBS, json=observations, status=observations_status,
+                   text=None if observations_status == 200 else "<html>404</html>",
+                   content_type="application/json" if observations_status == 200 else "text/html")
+
+
+def test_doctor_valid_keys(fake_api, capsys, no_skill_dirs):
+    route_doctor(fake_api)
+
+    code, out, _ = run(capsys, "doctor")
+
+    assert code == 0
+    assert "Source: flags" in out
+    assert "langfuse-agent-cli" in out  # project name from /api/public/projects
+    assert "4.70.0" in out
+
+
+def test_doctor_bad_keys(fake_api, capsys, no_skill_dirs):
+    route_doctor(fake_api, projects_status=401)
+
+    code, out, _ = run(capsys, "doctor")
+
+    assert code == 1
+    assert "401" in out
+
+
+def test_doctor_old_server_without_v2_observations(fake_api, capsys, no_skill_dirs):
+    route_doctor(fake_api, observations_status=404)
+
+    code, out, _ = run(capsys, "doctor")
+
+    assert code == 1
+    assert "/api/public/v2/observations" in out
+
+
+def test_auth_status_rejects_bad_keys(fake_api, capsys):
+    fake_api.route("GET", "/api/public/projects", json={"message": "Invalid credentials"}, status=401)
+
+    code, out, _ = run(capsys, "auth", "status")
+
+    assert code == 1
+    assert "Invalid credentials" in out

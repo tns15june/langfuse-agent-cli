@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "name": "intent-classification-evals",
+      "description": "Synthetic intent examples",
+      "metadata": null,
+      "inputSchema": null,
+      "expectedOutputSchema": null,
+      "projectId": "langfuse-agent-cli",
+      "createdAt": "2026-10-24T21:46:02.088Z",
+      "updatedAt": "2026-10-24T21:46:02.088Z",
+      "id": "cmvmxhhwo0008qm4anmzc91if"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 50,
+    "totalItems": 1,
+    "totalPages": 1
+  }
+}

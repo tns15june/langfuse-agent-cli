@@ -131,10 +131,6 @@ def create_parser() -> argparse.ArgumentParser:
     p_dataset_get = dataset_sub.add_parser("get", parents=[common_parser], help="Get dataset items")
     p_dataset_get.add_argument("name", help="Dataset name")
 
-    p_dataset_run = dataset_sub.add_parser("run", parents=[common_parser], help="Create a dataset evaluation run")
-    p_dataset_run.add_argument("--dataset", required=True, help="Target dataset name")
-    p_dataset_run.add_argument("--run-name", required=True, help="Evaluation run name")
-    p_dataset_run.add_argument("--description", help="Run description")
 
     # 6. Score command
     p_score = subparsers.add_parser("score", parents=[common_parser], help="Record evaluation scores")

@@ -69,7 +69,7 @@ def handle_auth(args: argparse.Namespace) -> int:
 
     # Default: status
     prof = resolve_from_args(args)
-    print(f"Current Profile: {prof.name}")
+    print(f"Source: {prof.source}" + (f" ({prof.name})" if prof.source == "profile" else ""))
     print(f"Host: {prof.host}")
     print(f"Public Key: {prof.masked_public_key()}")
     print(f"Secret Key: {prof.masked_secret_key()}")
@@ -78,11 +78,10 @@ def handle_auth(args: argparse.Namespace) -> int:
         print("⚠ Incomplete credentials. Configure with 'lf auth login'.")
         return 1
 
-    client = LangfuseClient(prof)
     try:
-        h = client.health()
-        print(f"✓ Connectivity: OK (status: {h.get('status')}, version: {h.get('version')})")
-        return 0
+        projects = LangfuseClient(prof).get_project().get("data") or []
     except LangfuseAPIError as e:
-        print(f"✗ Connection error: {e}")
+        print(f"✗ {e}")
         return 1
+    print(f"✓ Keys valid for project: {', '.join(p.get('name', '?') for p in projects) or '(none)'}")
+    return 0

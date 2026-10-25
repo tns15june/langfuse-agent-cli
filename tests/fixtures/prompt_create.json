@@ -1,0 +1,19 @@
+{
+  "id": "b5f9fb83-050b-4cf4-b026-aebd16e0ec47",
+  "createdAt": "2026-10-24T22:08:29.410Z",
+  "updatedAt": "2026-10-24T22:08:29.410Z",
+  "projectId": "langfuse-agent-cli",
+  "createdBy": "API",
+  "prompt": "Hi {{user_name}}",
+  "name": "greeter-test",
+  "version": 1,
+  "type": "text",
+  "isActive": null,
+  "config": {},
+  "tags": [],
+  "labels": [
+    "staging",
+    "latest"
+  ],
+  "commitMessage": null
+}

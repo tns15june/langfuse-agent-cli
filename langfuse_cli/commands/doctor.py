@@ -6,10 +6,10 @@ import sys
 from pathlib import Path
 
 from langfuse_cli import __version__
+from langfuse_cli.client import LangfuseAPIError, LangfuseClient
 from langfuse_cli.config import ConfigManager, resolve_from_args
-from langfuse_cli.client import LangfuseClient, LangfuseAPIError
 
-
+SKILL_NAME = "langfuse-agent-cli"
 KNOWN_SKILL_TARGETS = [
     ("Claude Code", Path.home() / ".claude" / "skills"),
     ("Antigravity", Path.home() / ".gemini" / "config" / "skills"),
@@ -19,6 +19,28 @@ KNOWN_SKILL_TARGETS = [
 ]
 
 
+def _check_server(client: LangfuseClient) -> bool:
+    try:
+        health = client.health()
+        print(f"  ✓ Connectivity: OK (server version {health.get('version', 'unknown')})")
+        projects = client.get_project().get("data") or []
+        print(f"  ✓ API Authorization: Valid (project: {', '.join(p.get('name', '?') for p in projects)})")
+    except LangfuseAPIError as e:
+        hint = {401: " (verify public/secret keys)", 403: " (check project access)"}.get(e.status_code or 0, "")
+        print(f"  ✗ {e}{hint}")
+        return False
+    try:
+        client.list_observations(limit=1, fields="core")
+        print("  ✓ Observations API v2: available")
+    except LangfuseAPIError as e:
+        if e.status_code == 404:
+            print("  ✗ This server has no /api/public/v2/observations; trace commands need Langfuse v4")
+        else:
+            print(f"  ✗ Observations API v2: {e}")
+        return False
+    return True
+
+
 def handle_doctor(args: argparse.Namespace) -> int:
     cfg = ConfigManager()
     prof = resolve_from_args(args)
@@ -26,62 +48,38 @@ def handle_doctor(args: argparse.Namespace) -> int:
     print("\nLangfuse Agent CLI System Diagnostics")
     print("=" * 45)
 
-    # 1. Build and runtime
     print("\n1. Build & Runtime")
     print(f"  CLI Version: {__version__}")
     print(f"  Python Version: {sys.version.split()[0]}")
     print(f"  Config File: {cfg.config_path} ({'exists' if cfg.config_path.exists() else 'not created yet'})")
 
-    # 2. Resolved Auth Profile
     print("\n2. Resolved Authentication")
-    print(f"  Profile Name: {prof.name}")
+    print(f"  Source: {prof.source}" + (f" ({prof.name})" if prof.source == "profile" else ""))
     print(f"  Host Endpoint: {prof.host}")
     print(f"  Public Key: {prof.masked_public_key()}")
     print(f"  Secret Key: {prof.masked_secret_key()}")
-
-    auth_ok = False
     if not prof.is_complete():
-        print("  ✗ Status: Incomplete credentials. Set via 'lf auth login' or LANGFUSE_* env vars.")
+        print("  ✗ Incomplete credentials. Run 'lf auth login' or set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY.")
+        auth_ok = False
     else:
-        client = LangfuseClient(prof)
-        try:
-            h = client.health()
-            print(f"  ✓ Connectivity: OK (server status: {h.get('status')}, version: {h.get('version', 'N/A')})")
+        auth_ok = _check_server(LangfuseClient(prof))
 
-            # Test API auth with traces query
-            try:
-                res = client.list_traces(limit=1)
-                trace_count = len(res.get("data", []))
-                print(f"  ✓ API Authorization: Valid (trace probe returned {trace_count} items)")
-                auth_ok = True
-            except LangfuseAPIError as ae:
-                if ae.status_code == 401:
-                    print("  ✗ API Authorization: Failed (HTTP 401 Unauthorized - verify public/secret keys)")
-                elif ae.status_code == 403:
-                    print("  ✗ API Authorization: Forbidden (HTTP 403 - check project access permissions)")
-                else:
-                    print(f"  ✗ API Authorization Probe Error: {ae}")
-        except LangfuseAPIError as e:
-            print(f"  ✗ Host Connectivity Failed: {e}")
-
-    # 3. Companion Skills Inspection
-    print("\n3. Agent Skills Ecosystem")
+    print("\n3. Agent Skill")
     skills_found = 0
     for name, target_dir in KNOWN_SKILL_TARGETS:
-        skill_path = target_dir / "langfuse"
+        skill_path = target_dir / SKILL_NAME
         if skill_path.exists():
             skills_found += 1
             print(f"  ✓ {name:<18} Installed at {skill_path}")
         else:
-            print(f"  – {name:<18} Not installed ({target_dir})")
+            print(f"  – {name:<18} Not found in {target_dir}")
 
     print("\nSummary:")
-    if auth_ok and skills_found > 0:
-        print("  ✓ All systems operational. Both CLI and Agent Skills are ready.")
-        return 0
-    elif not auth_ok:
-        print("  ⚠ Auth setup needed: Run 'lf auth login' to configure valid credentials.")
+    if not auth_ok:
+        print("  ⚠ Fix the authentication or server problem above.")
         return 1
+    if skills_found:
+        print("  ✓ All checks passed.")
     else:
-        print("  ℹ Skills not installed: Run 'lf skills install' to register skills with your AI coding agents.")
-        return 0
+        print("  ℹ Skill not installed. Install it with: npx skills add tns15june/langfuse-agent-cli")
+    return 0
