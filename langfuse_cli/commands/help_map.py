@@ -47,8 +47,10 @@ COMMAND_CATALOG: Dict[str, Dict[str, Any]] = {
         "write": True,
         "opts": ["--yes", "--host <url>"],
         "rules": [
-            "Prompts for keys unless --yes is given or stdin is not a terminal; agents run it with --yes.",
+            "Asks for the host and keys when a saved profile is missing or rejected, and before installing the "
+            "skill, unless --yes is given or stdin is not a terminal; agents run it with --yes.",
             "Installs the skill version that matches the CLI; run it again after upgrading.",
+            "Exit code 1 means an authentication or server problem, or that the skill was not installed.",
         ],
     },
     "prompt list": {

@@ -65,7 +65,7 @@ def format_agent_output(
         # Prune inside each row but keep the rows: dropping emptied rows would print [] for real results.
         data = [prune(row) for row in data] if isinstance(data, list) else prune(data)
     text = json.dumps(data, indent=2, ensure_ascii=False)
-    if summary and len(text.encode("utf-8")) > SUMMARY_THRESHOLD_BYTES:
+    if summary and len(text.encode("utf-8", "surrogatepass")) > SUMMARY_THRESHOLD_BYTES:
         return json.dumps(_write_summary(data, text), indent=2)
     return text
 
@@ -73,9 +73,13 @@ def format_agent_output(
 def _write_summary(data: Any, text: str) -> Dict[str, Any]:
     """Write `text` to a new private file and describe it."""
     content = (clean(text) + "\n").encode("utf-8")  # the file gets the same escaping as the terminal
-    fd, path = tempfile.mkstemp(prefix="lf-", suffix=".json")  # mode 0600
-    with os.fdopen(fd, "wb") as f:
-        f.write(content)
+    fd, path = tempfile.mkstemp(prefix="lf-", suffix=".json")  # mode 0600; kept, the caller reads it after lf exits
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
+    except BaseException:
+        os.unlink(path)  # no half-written file left behind
+        raise
     envelope: Dict[str, Any] = {"summary": True, "outputFile": path, "bytes": len(content)}
     if isinstance(data, list):
         envelope["rows"] = len(data)

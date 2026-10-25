@@ -17,6 +17,9 @@ def login(cfg: ConfigManager, profile_name: str, host: str, public_key: Optional
         public_key = input("Enter Langfuse Public Key (pk-lf-...): ").strip()
     if not secret_key:
         secret_key = getpass.getpass("Enter Langfuse Secret Key (sk-lf-...): ").strip()
+    if not public_key or not secret_key:  # an empty answer must never replace saved keys
+        print("✗ Both keys are needed; nothing was saved.", file=sys.stderr)
+        return 1
 
     cfg.save_profile(
         name=profile_name,

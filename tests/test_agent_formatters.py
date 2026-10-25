@@ -45,3 +45,13 @@ def test_agent_fields_traverse_lists():
     data = {"obs": [{"name": "x"}, {"name": "y"}]}
 
     assert json.loads(format_agent_output(data, agent_fields="obs.name")) == {"obs.name": ["x", "y"]}
+
+
+def test_summary_threshold_counts_utf8_bytes_and_unions_row_keys():
+    at = {"name": "x" * (16 * 1024 - 16)}  # indent=2 adds 16 bytes: exactly 16 KB
+    assert len(format_agent_output(at).encode("utf-8")) == 16 * 1024
+    assert format_agent_output(at, summary=True) == format_agent_output(at)
+    assert json.loads(format_agent_output({"name": "x" * (16 * 1024 - 15)}, summary=True))["summary"] is True
+    assert json.loads(format_agent_output({"name": "é" * 8200}, summary=True))["summary"] is True  # 8,216 characters
+    rows = [{"id": "a"}, {"id": "b", "error": "x" * (17 * 1024)}]
+    assert json.loads(format_agent_output(rows, summary=True))["rowKeys"] == ["id", "error"]

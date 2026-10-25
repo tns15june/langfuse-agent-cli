@@ -18,6 +18,31 @@ def test_auth_login_prompts_without_crashing(fake_api, monkeypatch):
     assert fake_api.calls[-1][1] == "/api/public/projects"
 
 
+def test_auth_login_refuses_empty_keys(fake_api, monkeypatch, capsys):
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    monkeypatch.setattr("getpass.getpass", lambda _: "")
+
+    assert main(["auth", "login", "--host", "http://lf.test"]) == 1
+    assert ConfigManager().list_profiles() == {}
+    assert "nothing was saved" in capsys.readouterr().err
+
+
+def test_auth_login_without_default_keeps_the_current_profile(fake_api):
+    ConfigManager().save_profile("prod", "http://prod.test", "pk-1", "sk-1")
+    fake_api.route("GET", "/api/public/projects", json=load_fixture("projects"))
+
+    assert main(["auth", "login", "--profile-name", "staging", "--host", "http://lf.test",
+                 "--public-key", "pk-2", "--secret-key", "sk-2"]) == 0
+    assert ConfigManager().get_current_profile_name() == "prod"
+
+
+def test_auth_login_with_unverifiable_keys_exits_1(fake_api, capsys):
+    fake_api.route("GET", "/api/public/projects", json={"message": "Invalid credentials"}, status=401)
+
+    assert main(["auth", "login", "--host", "http://lf.test", "--public-key", "pk", "--secret-key", "sk"]) == 1
+    assert "could not be verified" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("family", ["auth", "prompt", "trace", "dataset", "score"])
 def test_family_without_subcommand_exits_2(family):
     with pytest.raises(SystemExit) as exc:

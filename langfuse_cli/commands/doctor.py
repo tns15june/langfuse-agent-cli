@@ -86,5 +86,5 @@ def handle_doctor(args: argparse.Namespace) -> int:
     if skills_found:
         print("  ✓ All checks passed.")
     else:
-        print(f"  ℹ Skill not installed. Run 'lf setup', or: npx skills add {SKILL_SOURCE} -g")
+        print(f"  ℹ Skill not installed. Run 'lf setup', or: npx skills@1 add {SKILL_SOURCE} -g")
     return 0
