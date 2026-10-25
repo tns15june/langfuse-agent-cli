@@ -3,7 +3,7 @@
 ## Formats
 
 - JSON (default for data commands): exactly one JSON document on stdout, safe to pipe into `jq`.
-  `doctor`, `setup`, `auth`, `help-map` and `trace get --timeline` print text.
+  `doctor`, `setup`, `upgrade`, `uninstall`, `auth`, `help-map` and `trace get --timeline` print text.
 - Text (`-o text`): short lines for people. `lf trace get <trace-id> -o text` prints the timeline.
 - Errors go to stderr and the exit code is non-zero; `doctor`, `lf setup --yes` and `auth status`
   print their report, failures included, on stdout.
@@ -61,6 +61,22 @@ A list gives `rows` and `rowKeys`, the keys found in its rows; an object, such a
 file path for a summary and nothing otherwise (`.summary` fails on a list). Read the file with `jq`,
 for example `jq '.[] | select(.level == "ERROR") | {traceId, statusMessage}' /tmp/lf-y7qgu_0r.json`.
 Text output is never summarized, and `lf` does not delete the files.
+
+## Metrics
+
+`lf metrics` prints one JSON row per group. Result keys are `<aggregation>_<measure>`, such as
+`sum_totalCost`, `p95_latency` and `count_count`, next to the dimensions you grouped by;
+`time_dimension` holds the bucket when you pass `--granularity`. A null dimension means the value is not
+set on those observations: `providedModelName` is null for steps that are not model calls.
+
+```json
+[
+  {"providedModelName": "gpt-4o-mini", "sum_totalCost": 0.007452, "sum_totalTokens": 36720},
+  {"providedModelName": null, "sum_totalCost": 0, "sum_totalTokens": 0}
+]
+```
+
+Costs are in USD, and metrics latency is in milliseconds. With `-o text`, the rows print as a table.
 
 ## Failing traces
 

@@ -2,7 +2,7 @@
 
 **Author**: Tarkeshwar Narayan (tns15june)
 **Status**: Draft for discussion
-**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.3.0
+**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.4.0
 
 ## Summary
 

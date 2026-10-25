@@ -33,6 +33,47 @@ can miss older errors; `lf trace get <trace-id>` shows all of them.
 4. `lf trace session <session-id> --compact` shows the turns around it, when the error depends
    on earlier turns.
 
+## Time windows
+
+`--from-ts` and `--to-ts` take ISO-8601 timestamps. Turn the user's words into UTC first: "the last
+hour" is now minus one hour, "today" starts at `T00:00:00Z` of today's date, "this week" starts on
+Monday. Say in the answer which window you used.
+
+## Metrics
+
+`lf metrics` reads `GET /api/public/v2/metrics`: aggregates over a time range, grouped the way you ask.
+
+| Option | Meaning |
+| --- | --- |
+| `--metric totalCost,latency:p95` | What to compute: measure, then an optional aggregation |
+| `--by providedModelName,name` | Group by these dimensions |
+| `--where level=ERROR` | Filter; repeat it for more |
+| `--granularity hour` | Group by time: minute, hour, day, week, month or auto |
+| `--from-ts`, `--to-ts` | The window; the last 24 hours by default |
+| `--order-by sum_totalCost` | Sort by a result key, largest first; add `:asc` for smallest first |
+| `--limit 20` | Return at most this many rows (1 to 1000, default 100) |
+| `--view scores-numeric` | Aggregate scores instead of observations |
+
+Observation measures: `count`, `latency`, `timeToFirstToken`, `streamingLatency`, `inputTokens`,
+`outputTokens`, `totalTokens`, `inputCost`, `outputCost`, `totalCost`, `tokensPerSecond`,
+`outputTokensPerSecond`, `countScores`. Aggregations: `sum`, `avg`, `count`, `max`, `min`, `p50`,
+`p75`, `p90`, `p95`, `p99`. Without one, `count` counts, `value` and the latency and speed measures
+average, and everything else sums.
+
+Observation dimensions for `--by` and `--where`: `name`, `type`, `level`, `environment`,
+`providedModelName`, `promptName`, `promptVersion`, `traceName`, `tags`, `release`, `version`,
+`isRootObservation`. `userId`, `sessionId` and `traceId` work in `--where` only.
+
+The score views (`scores-numeric`, `scores-boolean`, `scores-categorical`) group by `name`, `source`,
+`dataType`, `traceName` and `observationName`, and measure `value` and `count`.
+
+```bash
+lf metrics --metric totalCost,totalTokens --by providedModelName --from-ts 2026-10-20T00:00:00Z
+lf metrics --where level=ERROR --by name --order-by count_count --from-ts 2026-10-24T00:00:00Z
+lf metrics --where level=ERROR --where name=search_tool_call --granularity hour --from-ts 2026-10-24T00:00:00Z
+lf metrics --where userId=user-3 --metric count --by name
+```
+
 ## Servers without the v2 observations API
 
 If `lf doctor` reports that `/api/public/v2/observations` is missing, the server predates
