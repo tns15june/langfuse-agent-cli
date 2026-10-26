@@ -22,7 +22,7 @@ langfuse-agent-cli command, and its agent skill.
 2. If the shell says `lf` is not found, try `~/.local/bin/lf --version`; uv and pipx put `lf` there. If
    that works, use that path for every command below, and tell the user to add `~/.local/bin` to their
    PATH (`uv tool update-shell` or `pipx ensurepath`).
-3. If it prints "lf 0.4.0" or a later version, go to "Run setup". If it prints an older version, ask the
+3. If it prints "lf 0.4.1" or a later version, go to "Run setup". If it prints an older version, ask the
    user, then upgrade it with the tool that installed it, `uv tool upgrade langfuse-agent-cli` or
    `pipx upgrade langfuse-agent-cli` (versions before 0.4.0 have no `lf upgrade`), and go to "Run setup".
    If it prints anything else, another program named `lf` is installed: stop and tell the user.

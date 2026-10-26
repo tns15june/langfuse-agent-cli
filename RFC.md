@@ -2,13 +2,13 @@
 
 **Author**: Tarkeshwar Narayan (tns15june)
 **Status**: Draft for discussion
-**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.4.0
+**Prototype**: [tns15june/langfuse-agent-cli](https://github.com/tns15june/langfuse-agent-cli) 0.4.1
 
 ## Summary
 
 Langfuse already has an official CLI and official agent skills. This RFC proposes three small,
 separable features for `@langfuse/cli` that let coding agents control how much of a response reaches
-their context, plus two rules for `langfuse/skills`. All three are prototyped in `langfuse-agent-cli`,
+their context, plus two rules for `langfuse/skills`. All four are prototyped in `langfuse-agent-cli`,
 and proposals 1 and 2 are measured below.
 
 ## What exists today
@@ -92,6 +92,27 @@ receive keys that came from another.
 
 **Prototype.** `lf auth …` and `lf doctor`.
 
+### 4. A readable shorthand for the metrics API
+
+**Problem.** `GET /api/public/v2/metrics` answers the questions people ask most ("what did we spend
+per model this week?", "which step is slowest?", "when did the errors start?"), but it takes one
+JSON object with `view`, `metrics[{measure, aggregation}]`, `dimensions`, `filters[{column, operator,
+value, type}]`, `timeDimension`, `fromTimestamp`, `toTimestamp` and `config.row_limit`. Composing it
+is where agents make mistakes: a filter with the wrong `type`, a time series cut at the default 100
+rows, or `orderBy` dropping the empty buckets.
+
+**Proposal.** Flags that build the object: `--metric measure[:aggregation],...` with a default
+aggregation per measure (sum for cost and tokens, avg for latency, count for count), `--by dim,...`,
+`--where column=value` typed by column (boolean, number, tags as `any of`, else string),
+`--granularity`, `--from-ts`/`--to-ts` with a documented default window, `--order-by field[:asc]`,
+and a row limit that grows to 1000 when a time dimension is present, with a warning when a result
+fills it. The result keys (`sum_totalCost`, `p95_latency`, `time_dimension`) stay as the API returns
+them, so nothing is renamed.
+
+**Prototype.** `lf metrics` in `langfuse_cli/commands/metrics.py`, run against Langfuse 4.30 and
+4.70. Ten fresh coding-agent sessions that saw only the skill's one-line examples composed correct
+spend, latency, error-count, token and score queries with it.
+
 ### For `langfuse/skills`
 
 1. **Write safety.** Before a write (prompt create, score create, dataset item create), read the
@@ -112,7 +133,8 @@ A separate, small pull request adds field-selection and `--level ERROR` tips to
 ## Questions for maintainers
 
 1. Would pull requests for proposals 1–3 fit the generated design of `@langfuse/cli`, as global
-   flags with no per-endpoint code?
+   flags with no per-endpoint code? Proposal 4 is per-endpoint by nature; would it belong in the CLI
+   or in the skill, as a documented recipe?
 2. What threshold and file location would suit the envelope?
 3. Should credentials stay environment and `.env` only, or is there interest in profiles?
 

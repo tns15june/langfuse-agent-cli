@@ -8,7 +8,7 @@ plus an agent skill that teaches your agent the commands.
 
 ![lf trace get --timeline --io marks the failing tool call with its error message and its input](https://raw.githubusercontent.com/tns15june/langfuse-agent-cli/main/docs/lf-timeline.png)
 
-> **Status: prototype.** Langfuse ships an official CLI,
+> **Status: beta.** Langfuse ships an official CLI,
 > [`@langfuse/cli`](https://github.com/langfuse/langfuse-cli), which covers the whole API, and official
 > agent skills, [`langfuse/skills`](https://github.com/langfuse/skills). This project tries out
 > agent-oriented features on the same API.
@@ -20,7 +20,7 @@ plus an agent skill that teaches your agent the commands.
 - Python 3.10 or newer
 - Langfuse v4, self-hosted or Cloud. The trace commands read `/api/public/v2/observations`;
   `lf doctor` reports if a server does not have it.
-- Node.js 22.20 or newer, only for installing the agent skill
+- Node.js 22.20 or newer, only for installing or removing the agent skill
 
 ## Install
 
