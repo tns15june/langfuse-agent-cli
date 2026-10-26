@@ -17,13 +17,14 @@ SKILL_REMOVE = ["/usr/bin/npx", "--yes", "skills@1", "remove", "-g", "-y", "lang
 class Runner:
     """Stands in for subprocess.run: records each command and returns the queued exit codes."""
 
-    def __init__(self, *codes):
-        self.codes, self.calls, self.kwargs = list(codes), [], []
+    def __init__(self, *codes, version_after="0.9.9"):
+        self.codes, self.calls, self.kwargs, self.version_after = list(codes), [], [], version_after
 
     def __call__(self, cmd, **kwargs):
         self.calls.append(cmd)
         self.kwargs.append(kwargs)
-        return subprocess.CompletedProcess(cmd, self.codes.pop(0) if self.codes else 0)
+        stdout = f"lf {self.version_after}\n" if cmd[-1] == "--version" else None
+        return subprocess.CompletedProcess(cmd, self.codes.pop(0) if self.codes else 0, stdout=stdout)
 
 
 class RemovingRunner(Runner):
@@ -72,15 +73,40 @@ def saved_profile():
 # --- upgrade ---------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("installer,upgrade", [
-    ("uv", ["/usr/bin/uv", "tool", "upgrade", "langfuse-agent-cli"]),
-    ("pipx", ["/usr/bin/pipx", "upgrade", "langfuse-agent-cli"]),
+    ("uv", ["/usr/bin/uv", "tool", "upgrade", "--no-cache", "langfuse-agent-cli"]),  # a cached index hides new releases
+    ("pipx", ["/usr/bin/pipx", "upgrade", "--pip-args=--no-cache-dir", "langfuse-agent-cli"]),
 ])
 def test_upgrade_uses_the_installer_then_runs_the_new_setup(monkeypatch, tools, installer, upgrade):
     method(monkeypatch, installer)
 
     assert main(["upgrade", "--yes"]) == 0
 
-    assert tools.calls == [upgrade, [LF, "setup", "--yes"]]
+    assert tools.calls == [upgrade, [LF, "--version"], [LF, "setup", "--yes"]]
+
+
+def test_upgrade_that_changed_nothing_while_pypi_has_a_newer_version_says_so(monkeypatch, capsys, tools):
+    from langfuse_cli import __version__
+    method(monkeypatch, "uv")
+    tools.version_after = __version__  # the installer answered "Nothing to upgrade"
+    monkeypatch.setattr(install_info, "latest_version", lambda timeout=3.0: "9.9.9")
+
+    assert main(["upgrade", "--yes"]) == 1
+
+    out = capsys.readouterr().out
+    assert "9.9.9" in out and "still" in out and "again" in out
+    assert not any(call[-2:] == ["setup", "--yes"] for call in tools.calls)  # no point checking the old version
+
+
+def test_upgrade_that_changed_nothing_at_the_latest_version_runs_setup(monkeypatch, capsys, tools):
+    from langfuse_cli import __version__
+    method(monkeypatch, "uv")
+    tools.version_after = __version__
+    monkeypatch.setattr(install_info, "latest_version", lambda timeout=3.0: __version__)
+
+    assert main(["upgrade", "--yes"]) == 0
+
+    assert "already the latest" in capsys.readouterr().out
+    assert tools.calls[-1] == [LF, "setup", "--yes"]
 
 
 def test_upgrade_in_a_terminal_lets_setup_ask(monkeypatch, tools):
@@ -109,7 +135,7 @@ def test_upgrade_keeps_keys_from_the_installer_but_not_from_the_follow_up_setup(
 
     main(["upgrade", "--yes"])
 
-    installer, setup = tools.kwargs
+    installer, _version, setup = tools.kwargs
     assert not [k for k in installer["env"] if k.startswith("LANGFUSE_")]
     assert "env" not in setup  # lf setup reads the credentials from the environment
 

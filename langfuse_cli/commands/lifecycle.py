@@ -14,7 +14,9 @@ from langfuse_cli.commands.auth import ask
 from langfuse_cli.config import ConfigManager
 
 PACKAGE = install_info.PACKAGE
-UPGRADE = {"uv": ["uv", "tool", "upgrade", PACKAGE], "pipx": ["pipx", "upgrade", PACKAGE]}
+# Both refresh the package index: its cached copy can hide a release made minutes ago.
+UPGRADE = {"uv": ["uv", "tool", "upgrade", "--no-cache", PACKAGE],
+           "pipx": ["pipx", "upgrade", "--pip-args=--no-cache-dir", PACKAGE]}
 UNINSTALL = {"uv": ["uv", "tool", "uninstall", PACKAGE], "pipx": ["pipx", "uninstall", PACKAGE]}
 SKILL_REMOVE = ["npx", "--yes", "skills@1", "remove", "-g", "-y", install_info.SKILL_NAME]
 
@@ -46,8 +48,22 @@ def handle_upgrade(args: argparse.Namespace) -> int:
     if code:
         print(f"✗ The upgrade failed (exit code {code}); lf {__version__} is unchanged.")
         return 1
+    launcher = install_info.lf_location()
+    try:
+        now = subprocess.run([launcher, "--version"], capture_output=True, text=True).stdout.split()[-1]
+    except (OSError, IndexError):
+        now = __version__
+    if now == __version__:
+        latest = install_info.latest_version()
+        if latest and install_info.is_newer(latest):
+            print(f"✗ lf is still {__version__}, but PyPI lists {latest}. Package indexes cache for a few minutes; "
+                  "run lf upgrade again shortly.")
+            return 1
+        print(f"✓ lf {__version__} is already the latest version.")
+    else:
+        print(f"✓ lf {__version__} → {now}")
     # The same launcher now runs the upgraded lf, which installs the skill of its own version.
-    return subprocess.run([install_info.lf_location(), "setup", *(["--yes"] if args.yes else [])]).returncode
+    return subprocess.run([launcher, "setup", *(["--yes"] if args.yes else [])]).returncode
 
 
 def _skill_paths() -> List[Path]:
