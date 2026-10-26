@@ -18,10 +18,11 @@ class Runner:
     """Stands in for subprocess.run: records each command and returns the queued exit codes."""
 
     def __init__(self, *codes):
-        self.codes, self.calls = list(codes), []
+        self.codes, self.calls, self.kwargs = list(codes), [], []
 
     def __call__(self, cmd, **kwargs):
         self.calls.append(cmd)
+        self.kwargs.append(kwargs)
         return subprocess.CompletedProcess(cmd, self.codes.pop(0) if self.codes else 0)
 
 
@@ -99,6 +100,27 @@ def test_upgrade_of_a_pip_install_explains_and_runs_nothing(monkeypatch, capsys,
     assert tools.calls == []
     assert "pip install --upgrade langfuse-agent-cli" in err
     assert "not installed with uv or pipx" in err  # install_method cannot tell pip from conda or a project venv
+
+
+def test_upgrade_keeps_keys_from_the_installer_but_not_from_the_follow_up_setup(monkeypatch, tools):
+    method(monkeypatch, "uv")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-1")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-1")
+
+    main(["upgrade", "--yes"])
+
+    installer, setup = tools.kwargs
+    assert not [k for k in installer["env"] if k.startswith("LANGFUSE_")]
+    assert "env" not in setup  # lf setup reads the credentials from the environment
+
+
+def test_uninstall_keeps_keys_from_npx_and_the_installer(monkeypatch, tools, installed_skill):
+    method(monkeypatch, "uv")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-1")
+
+    main(["uninstall", "--yes"])
+
+    assert tools.kwargs and all(not [k for k in kw["env"] if k.startswith("LANGFUSE_")] for kw in tools.kwargs)
 
 
 def test_failed_upgrade_does_not_run_setup(monkeypatch, capsys, tools):

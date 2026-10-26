@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,8 +27,9 @@ def _run(cmd: List[str], exe: Optional[str] = None) -> int:
             print(f"  ✗ {why_not}")
             return 127
     print(f"  Running: {' '.join(cmd)}", flush=True)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("LANGFUSE_")}  # keys stay out of installers
     try:
-        return subprocess.run([exe, *cmd[1:]]).returncode
+        return subprocess.run([exe, *cmd[1:]], env=env).returncode
     except OSError as e:
         print(f"  ✗ {e}")
         return 1

@@ -13,8 +13,8 @@ jobs:
       matrix:
         python: ["3.10", "3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
@@ -26,7 +26,7 @@ jobs:
     # docs/install.sh is piped into sh by users; shellcheck catches POSIX and quoting mistakes.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: shellcheck docs/install.sh
 
   live:
@@ -43,8 +43,8 @@ jobs:
       LANGFUSE_PUBLIC_KEY: pk-lf-ci-public
       LANGFUSE_SECRET_KEY: sk-lf-ci-secret
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Start the latest Langfuse release

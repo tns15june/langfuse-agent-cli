@@ -29,7 +29,7 @@ langfuse-agent-cli command, and its agent skill.
 
 ## Install
 
-Only when neither `lf` nor `~/.local/bin/lf` works:
+Only when neither `lf` nor `~/.local/bin/lf` works (macOS and Linux; on Windows use uv or pipx as below):
 
 ```bash
 curl -fsSL https://tns15june.github.io/langfuse-agent-cli/install.sh | sh -s -- --yes
