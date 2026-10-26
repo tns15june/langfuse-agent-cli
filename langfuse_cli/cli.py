@@ -65,7 +65,8 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="lf",
-        description="Agent-oriented CLI for Langfuse traces, prompts, datasets and scores.",
+        description="Ask your coding agent about your LLM app in plain English; it answers from your Langfuse data "
+                    "with lf: traces, metrics, prompts, datasets and scores.",
         parents=[common_parser],
     )
     parser.add_argument("-v", "--version", action="version", version=f"lf {__version__}")

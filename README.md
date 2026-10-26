@@ -179,9 +179,9 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
 Observations with a measured duration show it in brackets, such as `[1.24s]`. Langfuse 4.70 reports
 no duration for observations of zero length, like these synthetic ones.
 
-Exit codes: `0` success, `1` API or configuration error, `2` invalid command. The reason for a failure is
-on stderr, except that `doctor`, `setup --yes` and `auth status` print their whole report, failures
-included, on stdout. `setup` also exits `1` when the skill was not installed.
+Exit codes: `0` success, `1` API or configuration error, `2` invalid command, `130` Ctrl-C at a prompt.
+The reason for a failure is on stderr, except that `doctor`, `setup --yes` and `auth status` print their
+whole report, failures included, on stdout. `setup` also exits `1` when the skill was not installed.
 
 ## Troubleshooting
 
@@ -193,7 +193,7 @@ included, on stdout. `setup` also exits `1` when the skill was not installed.
 | "This server has no /api/public/v2/observations" | The server predates Langfuse v4. The trace commands need an upgraded server. |
 | "npx not found" or "Skill not installed" | Install Node.js 22.20 or later, then run `lf setup`. |
 | Your saved profile is ignored | `LANGFUSE_PUBLIC_KEY` or `LANGFUSE_SECRET_KEY` is set; environment variables take precedence over profiles. |
-| "The installed skill is v0.3.0" | Run `lf setup` to install the skill that matches your `lf` version. |
+| "The installed skill is v…" (an older version) | Run `lf setup` to install the skill that matches your `lf` version. |
 
 ## API endpoints used
 
@@ -236,16 +236,19 @@ the latest Langfuse release, on every push and weekly.
 ### Releasing
 
 The Publish workflow uploads to PyPI with trusted publishing, so no token is stored; the PyPI project
-lists `publish.yml` and the GitHub environment `pypi` as its trusted publisher. Bump `__version__` in
-`langfuse_cli/__init__.py`, commit, then push that commit and its tag together:
+lists `publish.yml` and the GitHub environment `pypi` as its trusted publisher. `main` accepts changes
+only through pull requests, so bump `__version__` in `langfuse_cli/__init__.py` in a pull request,
+merge it, then tag the merge commit right away and push the tag:
 
 ```bash
-git tag v0.4.0 && git push --atomic origin main v0.4.0
+git fetch origin && git tag v0.5.0 origin/main && git push origin v0.5.0
+gh release create v0.5.0 --title "lf 0.5.0" --notes-file release-notes.md
 ```
 
 The workflow checks that the tag matches the version, runs the tests, builds and checks the
-distributions, installs the wheel, and uploads the wheel and the source archive. `main` should never
-carry a version without its tag, because `lf setup` and `lf doctor` point at the skill under that tag.
+distributions, installs the wheel, and uploads the wheel and the source archive. Tag as soon as the
+version bump is merged: `lf setup` and `lf doctor` point at the skill under the tag that matches the
+version on `main`.
 
 ## Feedback
 

@@ -116,5 +116,5 @@ Trace 33579e8e8ec602e878f0744ad53ac1fe: 3 observations, 1 error
 
 `✗ [ERROR]` and `⚠ [WARN]` mark failed and warning observations. A measured duration appears in
 brackets, such as `[1.24s]`; Langfuse 4.70 reports none for observations of zero length, like these
-synthetic ones. With `--io`, inputs and outputs shorter than 120 characters appear under their
-observation.
+synthetic ones. With `--io`, plain-text inputs and outputs shorter than 120 characters appear under
+their observation; JSON inputs and outputs, such as chat messages, are only in the JSON output.
