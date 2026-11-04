@@ -21,10 +21,17 @@ and proposals 1 and 2 are measured below.
   use-case references, and installs with `npx skills add langfuse/skills` or as a plugin. An open PR
   adds hosted-skill install and push to the CLI (langfuse-cli#27).
 - **The server already trims payloads**: `GET /api/public/v2/observations` returns only the field
-  groups a request asks for.
+  groups a request asks for, and the CLI exposes that as `--fields` on the commands that have it.
+- **The CLI already has the building blocks** (checked in `src/flags.ts` and `src/cli.ts` of
+  @langfuse/cli 1.3.1): `--output <file>` writes a response body to a file, `--json` wraps it as
+  `{status, headers, body}`, `--all --max-items` pages with a message when it stops early, and
+  `--api-version auto` reads the server version from `/api/public/health`.
 
-What is missing for agents is control over the size of what gets printed: a list or a trace with its
-inputs can run to hundreds of kilobytes, most of which the agent never reads.
+What is missing for agents is the layer above those blocks: nothing decides *when* a response is too
+big to print, nothing prunes or projects a response from an endpoint without `fields`, nothing says
+where the credentials came from or whether the server has the endpoints a command needs, and the
+metrics query still has to be written as one JSON object. A list or a trace with its inputs can run
+to hundreds of kilobytes, most of which the agent never reads.
 
 ## Measurements
 
@@ -51,7 +58,9 @@ traffic has longer messages and more metadata, so the numbers will differ.
 **Proposal.** `--output-summary auto`: when the JSON payload exceeds a threshold (for example
 16 KB), write it to a file and print a short envelope instead, with the file path, byte size, row
 count, the keys of the rows and, for a paged response, the next cursor. Below the threshold, print
-the payload as today. See Prior art.
+the payload as today. This builds on `--output <file>`, which already writes the body to a file: the
+addition is the automatic threshold and the summary that tells the agent what the file holds, so the
+agent does not have to choose between reading everything and reading nothing. See Prior art.
 
 **Prototype.** `--output-summary` in `langfuse_cli/formatters/agent.py`, with a 16 KB threshold,
 measured after field projection and pruning. The file goes to the system temp directory, readable
@@ -69,7 +78,9 @@ on the v2 observations API, page numbers on prompts and datasets).
 **Proposal.** `--select a,b.c` keeps only the listed fields of each row, with dotted paths that reach
 through lists; `--compact` drops null and empty values at every level; optional named presets per
 resource, for example `--select @triage` on observations (id, traceId, name, level, statusMessage,
-sessionId, startTime).
+sessionId, startTime). Server-side `--fields` stays the first choice where an endpoint has it; this
+is for the endpoints that do not, and for trimming inside a field group (an observation row in the
+`core,basic` groups still carries about twenty fields).
 
 **Measured.** −66% for the 7-field triage projection and −21% for pruning alone, on the CLI's own
 error output (table above).
@@ -86,7 +97,9 @@ the host or the server version is the cause.
 **Proposal.** `langfuse auth login|switch|list|status` with named profiles stored in a file readable
 only by the user, and `langfuse doctor`, which checks that the host is reachable, that the keys are
 valid (`GET /api/public/projects`), that the server has the endpoints the CLI needs (for example
-`/api/public/v2/observations`), and where each credential came from. Host and keys should always
+`/api/public/v2/observations`), and where each credential came from. `--api-version auto` already
+reads the server version from `/api/public/health`; `doctor` would reuse that probe and add the key
+check and the credential source, which is what a person needs when a call fails with 401. Host and keys should always
 come from the same source: a host from one place, such as a cloned repository's `.env`, should never
 receive keys that came from another.
 
@@ -133,8 +146,11 @@ A separate, small pull request adds field-selection and `--level ERROR` tips to
 ## Questions for maintainers
 
 1. Would pull requests for proposals 1–3 fit the generated design of `@langfuse/cli`, as global
-   flags with no per-endpoint code? Proposal 4 is per-endpoint by nature; would it belong in the CLI
-   or in the skill, as a documented recipe?
+   flags with no per-endpoint code? The names `select`, `compact`, `profile` and `output-summary` do
+   not collide with any query parameter in the 4.71.0 snapshot, so they would pass the compiler's
+   reserved-name check; `summary` or `doctor` as a hand-written command would sit next to `skills` in
+   the dispatch in `src/cli.ts`. Proposal 4 is per-endpoint by nature; would it belong in the CLI or
+   in the skill, as a documented recipe?
 2. What threshold and file location would suit the envelope?
 3. Should credentials stay environment and `.env` only, or is there interest in profiles?
 
